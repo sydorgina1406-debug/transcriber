@@ -144,7 +144,6 @@ async function ai(sys,user,sett){
   const p=sett.provider||"gemini";
   
   if(p==="gigachat" && sett.gigaKey){
-    // Интеграция официального API Сбера GigaChat через их общедоступный шлюз
     try {
       const r = await fetch("https://gigachat.devices.sberbank.ru/api/v1/chat/completions", {
         method: "POST",
