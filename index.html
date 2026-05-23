@@ -3,475 +3,71 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>ЭОТ-Транскрибатор · Юлия</title>
+<title>ЭОТ-Ассистент · Стиль Юлии</title>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
+:root {
+  --plum: #8B3252;
+  --forest: #2D4A3E;
+  --terra: #C4714A;
+  --warm-white: #F5F0EB;
+  --bg: #FFFFFF;
+  --dark: #3A2030;
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f8f7f4;min-height:100vh}
+body{font-family:'Jost', sans-serif;background:var(--warm-white);color:var(--dark);min-height:100vh}
+h1, h2, h3 {font-family:'Cormorant Garamond', serif; color:var(--plum)}
 #root{display:flex;min-height:100vh}
-.sidebar{width:200px;min-width:200px;background:#1a2535;display:flex;flex-direction:column;padding:1rem 0;min-height:100vh;position:fixed;left:0;top:0;bottom:0;z-index:10}
-.page{margin-left:200px;flex:1;padding:1.5rem;min-height:100vh}
-.nav-logo{padding:12px 16px 18px;border-bottom:0.5px solid rgba(255,255,255,.08);margin-bottom:8px}
-.nav-logo-title{color:#e2e8f0;font-size:15px;font-weight:600}
-.nav-logo-sub{color:#4a6080;font-size:11px;margin-top:2px}
-.nav-btn{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;color:#8fa3bc;background:none;border:none;font-size:13px;width:100%;text-align:left;font-family:inherit;transition:all .15s}
-.nav-btn:hover{background:rgba(255,255,255,.07);color:#e2e8f0}
-.nav-btn.active{background:rgba(99,179,237,.15);color:#63b3ed;border-right:2px solid #63b3ed}
-.nav-footer{margin-top:auto;padding-top:8px;border-top:0.5px solid rgba(255,255,255,.08)}
-.rec-dot{width:8px;height:8px;border-radius:50%;background:#f56565;display:inline-block;animation:pulse 1s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-.card{background:#fff;border:0.5px solid #e5e7eb;border-radius:12px;padding:1.25rem;margin-bottom:.75rem}
-.ti-item{padding:8px 12px;border-radius:8px;margin-bottom:6px;border-left:3px solid transparent}
-.ti-item.client{background:#f0f7ff;border-left-color:#378add}
-.ti-item.psychologist{background:#f0fff4;border-left-color:#1d9e75}
-.ti-item.interim{background:#fafafa;border-left-color:#ddd;opacity:.7}
-.note-card{background:#f8fafc;border:0.5px solid #e2e8f0;border-radius:12px;padding:.875rem;margin-bottom:.75rem}
-.mak-card{background:#fdf4ff;border:0.5px solid #e9d5ff;border-radius:12px;padding:1rem;margin-bottom:.75rem}
-.mak-title{display:flex;align-items:center;gap:6px;margin-bottom:.75rem;font-weight:600;font-size:13px;color:#6b21a8}
-.mak-pos{display:flex;gap:8px;padding:8px 0;border-bottom:0.5px solid #e9d5ff}
-.mak-pos:last-child{border-bottom:none}
-.mak-num{width:24px;min-width:24px;height:24px;border-radius:50%;background:#7c3aed;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;margin-top:1px;flex-shrink:0}
-.s-card{background:#fff;border:0.5px solid #e5e7eb;border-radius:12px;padding:1rem 1.25rem;margin-bottom:.75rem;cursor:pointer;transition:border-color .15s;display:flex;justify-content:space-between;align-items:flex-start}
-.s-card:hover{border-color:#93c5fd}
-.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;font-family:inherit;border:none;transition:all .15s}
-.btn-dark{background:#1a2535;color:#e2e8f0}
-.btn-dark:hover{background:#263548}
-.btn-danger{background:#fee2e2;color:#991b1b;border:0.5px solid #fca5a5}
-.btn-success{background:#dcfce7;color:#166534;border:0.5px solid #86efac}
-.btn-outline{background:none;border:0.5px solid #d1d5db;color:#6b7280}
-.btn-outline:hover{border-color:#9ca3af;color:#374151}
-.btn-mak{background:#f3e8ff;color:#6b21a8;border:0.5px solid #d8b4fe}
-.btn-mak:hover{background:#ede9fe}
-.btn:disabled{opacity:.4;cursor:default}
-.spk-tog{display:flex;border:0.5px solid #d1d5db;border-radius:8px;overflow:hidden}
-.spk-btn{padding:6px 12px;border:none;cursor:pointer;font-size:12px;background:none;color:#6b7280;font-family:inherit}
-.spk-btn.cl{background:#dbeafe;color:#1e40af;font-weight:500}
-.spk-btn.ps{background:#dcfce7;color:#166534;font-weight:500}
-.two-col{display:grid;grid-template-columns:55% 1fr;gap:.875rem}
-.panel{border:0.5px solid #e5e7eb;border-radius:12px;display:flex;flex-direction:column;background:#fff;overflow:hidden}
-.panel-hdr{padding:.625rem 1rem;border-bottom:0.5px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;background:#f8fafc}
-.panel-body{flex:1;padding:.875rem;overflow-y:auto;max-height:460px}
-.empty{text-align:center;padding:2rem 1rem;color:#94a3b8}
-.empty i{font-size:32px;display:block;margin-bottom:.5rem;opacity:.4}
-.tabs{display:flex;border-bottom:0.5px solid #e5e7eb;margin-bottom:.875rem}
-.tab{padding:7px 14px;border:none;background:none;cursor:pointer;font-size:13px;border-bottom:2px solid transparent;color:#6b7280;font-family:inherit}
-.tab.on{border-bottom-color:#3b82f6;color:#1d4ed8;font-weight:500}
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:flex-start;justify-content:center;padding-top:60px;z-index:100}
-.modal{background:#fff;border-radius:12px;padding:1.5rem;width:460px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
-.fl{font-size:12px;color:#6b7280;margin-bottom:4px;display:block;font-weight:500}
-.fi{width:100%;padding:8px 10px;border:0.5px solid #d1d5db;border-radius:8px;font-size:13px;margin-bottom:.875rem;font-family:inherit;color:#1e293b;background:#fff}
-.fi:focus{outline:none;border-color:#3b82f6}
-.ri{display:flex;align-items:center;gap:8px;padding:8px 12px;border:0.5px solid #e5e7eb;border-radius:8px;cursor:pointer;margin-bottom:6px}
-.ri:hover{border-color:#93c5fd}
-.ri.sel{border-color:#3b82f6;background:#eff6ff}
-.chip{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500}
-.cg{background:#dcfce7;color:#166534}
-.cb{background:#dbeafe;color:#1e40af}
-.cr{background:#fee2e2;color:#991b1b}
-.cp{background:#ede9fe;color:#5b21b6}
-.spin{display:inline-block;width:14px;height:14px;border:2px solid #e2e8f0;border-top-color:#3b82f6;border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle;margin-right:5px}
-.spinp{display:inline-block;width:14px;height:14px;border:2px solid #e9d5ff;border-top-color:#7c3aed;border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle;margin-right:5px}
-@keyframes sp{to{transform:rotate(360deg)}}
-.sbadge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:6px;font-size:11px;background:#f1f5f9;color:#475569;border:0.5px solid #e2e8f0;font-weight:500}
-.stag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;background:#ede9fe;color:#5b21b6;margin-right:4px;margin-bottom:4px}
-.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:.875rem;flex-wrap:wrap;gap:8px}
-.ctrls{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-h2{font-size:20px;font-weight:600;color:#0f172a;margin-bottom:4px}
-h3{font-size:14px;font-weight:600;color:#64748b;margin-bottom:.75rem}
-.sub{color:#64748b;font-size:13px;margin-bottom:1.25rem}
-.sname{border:none;background:none;font-size:16px;font-weight:600;outline:none;color:#0f172a;font-family:inherit;width:200px}
+.sidebar{width:220px;background:var(--forest);color:var(--warm-white);padding:2rem 1rem;position:fixed;height:100vh}
+.page{margin-left:220px;flex:1;padding:2rem}
+.nav-logo{font-family:'Cormorant Garamond', serif;font-size:24px;margin-bottom:2rem;color:var(--warm-white)}
+.nav-btn{padding:12px;color:#d1d5db;background:none;border:none;width:100%;text-align:left;cursor:pointer;font-family:'Jost',sans-serif}
+.nav-btn:hover{color:#fff}
+.panel{border:1px solid #e5e7eb;border-radius:16px;background:var(--bg);padding:1.5rem;margin-top:1rem;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05)}
+.btn{padding:12px 24px;border-radius:8px;cursor:pointer;border:none;font-weight:500;margin-right:10px;font-family:'Jost',sans-serif}
+.btn-dark{background:var(--dark);color:var(--warm-white)}
+.btn-success{background:var(--forest);color:var(--warm-white)}
 </style>
 </head>
 <body>
 <div id="root"></div>
-<script>
-let db = null;
-try {
-  firebase.initializeApp({
-    apiKey:"AIzaSyBUPWtHxkVVoXZK5V_WeCEAQjBaYjf9uwY",
-    authDomain:"mak-space-yulia.firebaseapp.com",
-    projectId:"mak-space-yulia",
-    storageBucket:"mak-space-yulia.firebasestorage.app",
-    messagingSenderId:"324239633120",
-    appId:"1:324239633120:web:b581fdd4a1ff79f92ffe85"
-  });
-  db = firebase.firestore();
-} catch (e) {
-  console.error("Firebase failed:", e);
-}
-</script>
 <script type="text/babel">
-const {useState, useEffect, useRef} = React;
-
-const FILLER=/\b(ну+|вот+|эм+|э+м*|м+|аа+|эй|ой|ах|ох|блин|короче|типа|как бы|значит|понимаешь|слушай|в общем|ладно|собственно)\b[,.]?\s*/gi;
-const clean=t=>t.replace(FILLER,"").replace(/\s{2,}/g," ").trim();
-
-const fmt=d=>{
-  if (!d) return "--:--";
-  const dateObj = new Date(d);
-  if (isNaN(dateObj.getTime())) return "--:--";
-  return dateObj.toLocaleTimeString("ru",{hour:"2-digit",minute:"2-digit"});
-};
-
-const fmtD=d=>{
-  if (!d) return "Дата неизвестна";
-  const dateObj = new Date(d);
-  if (isNaN(dateObj.getTime())) return "Некорректная дата";
-  return dateObj.toLocaleDateString("ru",{day:"numeric",month:"long",year:"numeric"});
-};
-
-const COLL="transcriber_sessions";
-
-async function fbLoad(){try{if(!db)return[];const s=await db.collection(COLL).orderBy("date","desc").limit(50).get();return s.docs.map(d=>({id:d.id,...d.data()}));}catch{return[];}}
-async function fbSave(s){try{if(db)await db.collection(COLL).doc(s.id).set(s);}catch{}}
-async function fbDel(id){try{if(db)await db.collection(COLL).doc(id).delete();}catch{}}
-async function fbSaveSett(d){try{if(db)await db.collection("transcriber_settings").doc("main").set(d);}catch{}}
-async function fbLoadSett(){try{if(!db)return null;const d=await db.collection("transcriber_settings").doc("main").get();return d.exists?d.data():null;}catch{return null;}}
-
-const ESYS=`Ты — супервизор-ассистент психолога Юлии, специалиста по ЭОТ, МАК и расстановкам.
-12-ШАГОВАЯ СТРУКТУРА ЭОТ:
-1.Клиническая беседа 2.Прояснение симптома 3.Создание образа 4.Стать образом+исследование(ПРЕДПИСАНИЯ) 5.Любовь и поддержка 6.Методы возврата 7.Методы разрешения 8.Новые убеждения 9.Соматизация 10.Ситуативная проверка 11.Экологическая проверка 12.Закрепление
-ОБРАЗ РЕБЁНКА:фиксация,убеждения,стратегия,потребность. ОБРАЗ РОДИТЕЛЯ:ЗДЕСЬ ПРЕДПИСАНИЯ через почему/зачем.
-Формат ответа:
-📍 ЭТАП:(номер и название)
-🔍 СЕЙЧАС:(1-2 предложения)
-💡 ПРЕДПИСАНИЯ/УБЕЖДЕНИЯ:(словами клиента)
-🔁 ПАТТЕРНЫ:(повторяющееся)
-💔 ФИКСАЦИЯ:(состояние ребёнка)
-💎 РЕСУРСЫ:(опоры)
-❓ НЕ ЗАКРЫТО:(важные темы)
-🌡️ ТЕЛО:(маркеры)
-➡️ ПОДСКАЗКА:(следующий шаг)
-Пиши кратко и конкретно.`;
-
-const MSYS=`Методист по МАК. Составь авторскую технику из 5-6 карт для психолога Юлии.
-Структура:1-2 диагностика→2-3 исследование→1-2 трансформация. К каждой позиции 1-2 открытых вопроса(без почему). Название метафоричное. Стиль как у "Анатомия обиды".
-Верни ТОЛЬКО JSON без markdown:{"title":"...","request":"...","positions":[{"num":1,"title":"...","instruction":"...","questions":["...","..."]}]}`;
-
-function extractJSON(str) {
-  if (!str) return null;
-  const start = str.indexOf("{");
-  const end = str.lastIndexOf("}");
-  if (start !== -1 && end !== -1) {
-    try {
-      return JSON.parse(str.substring(start, end + 1));
-    } catch (e) {
-      throw new Error("Некорректная структура JSON в ответе: " + e.message);
-    }
-  }
-  throw new Error("Блок JSON не найден в ответе ИИ.");
-}
-
-async function ai(sys,user,sett){
-  const p=sett.provider||"gemini";
-  
-  if(p==="gigachat" && sett.gigaKey){
-    try {
-      const r = await fetch("https://gigachat.devices.sberbank.ru/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${sett.gigaKey}`
-        },
-        body: JSON.stringify({
-          model: "GigaChat",
-          messages: [
-            { role: "system", content: sys },
-            { role: "user", content: user }
-          ],
-          temperature: 0.7
-        })
-      });
-      const d = await r.json();
-      if(d.error) throw new Error(d.error.message);
-      return d.choices?.[0]?.message?.content || "";
-    } catch (err) {
-      return "⚠️ Ошибка подключения к GigaChat.";
-    }
-  }
-  
-  if(p==="gemini"&&sett.geminiKey){
-    const r=await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key="+sett.geminiKey,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{parts:[{text:sys+"\n\n"+user}]}]})});
-    const d=await r.json();if(d.error)throw new Error(d.error.message);return d.candidates?.[0]?.content?.parts?.[0]?.text||"";
-  }
-  if(p==="claude"&&sett.claudeKey){
-    const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":sett.claudeKey,"anthropic-version":"2023-06-01"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:sys,messages:[{role:"user",content:user}]})});
-    const d=await r.json();if(d.error)throw new Error(d.error.message);return d.content?.[0]?.text||"";
-  }
-  if(p==="openai"&&sett.openaiKey){
-    const r=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+sett.openaiKey},body:JSON.stringify({model:"gpt-4o-mini",messages:[{role:"system",content:sys},{role:"user",content:user}]})});
-    const d=await r.json();if(d.error)throw new Error(d.error.message);return d.choices?.[0]?.message?.content||"";
-  }
-  return"⚠️ Нужен API-ключ выбранного провайдера. Откройте Настройки.";
-}
-
-function Sidebar({view,setView,isRec,onSett}){
-  const items=[{id:"home",ic:"ti-layout-dashboard",lb:"Главная"},{id:"live",ic:"ti-microphone",lb:"Живая сессия"},{id:"file",ic:"ti-file-upload",lb:"Обработка аудиофайла"}];
-  return(<div className="sidebar">
-    <div className="nav-logo"><div className="nav-logo-title">🧠 ЭОТ-Ассистент</div><div className="nav-logo-sub">транскрибатор · Юлия</div></div>
-    {items.map(it=>(<button key={it.id} className={"nav-btn"+(view===it.id?" active":"")} onClick={()=>setView(it.id)}><i className={"ti "+it.ic}></i>{it.lb}{it.id==="live"&&isRec&&<span className="rec-dot" style={{marginLeft:"auto"}}></span>}</button>))}
-    <div className="nav-footer"><button className="nav-btn" onClick={onSett}><i className="ti ti-settings"></i>Настройки</button></div>
-  </div>);
-}
-
-function MakCard({data}){
-  return(<div className="mak-card">
-    <div className="mak-title"><i className="ti ti-cards"></i>«{data.title}»</div>
-    {data.request&&<p style={{fontSize:12,color:"#7e22ce",marginBottom:".75rem",padding:"6px 10px",background:"#f5f3ff",borderRadius:6}}>Запрос: {data.request}</p>}
-    {(data.positions||[]).map((p,i)=>(<div key={i} className="mak-pos">
-      <div className="mak-num">{p.num}</div>
-      <div style={{flex:1}}><div style={{fontSize:12,fontWeight:600,color:"#6b21a8",marginBottom:2}}>{p.title}</div><div style={{fontSize:12,color:"#7e22ce",lineHeight:1.5}}>{p.instruction}</div>{(p.questions||[]).map((q,j)=>(<div key={j} style={{fontSize:11,color:"#9333ea",marginTop:3,fontStyle:"italic"}}>— {q}</div>))}</div>
-    </div>))}
-  </div>);
-}
-
-function NotesPanel({notes,mak,lN,lM,tr,onN,onM}){
-  const[tab,setTab]=useState("notes");
-  const endRef=useRef(null);
-  useEffect(()=>{if(tab==="notes"&&endRef.current)endRef.current.scrollIntoView({behavior:"smooth"});},[notes,tab]);
-  useEffect(()=>{if(mak)setTab("mak");},[mak]);
-  return(<div className="panel">
-    <div className="panel-hdr">
-      <div style={{display:"flex"}}>
-        <button style={{padding:"2px 10px",fontSize:12,border:"none",background:"none",cursor:"pointer",fontFamily:"inherit",borderBottom:tab==="notes"?"2px solid #3b82f6":"2px solid transparent",color:tab==="notes"?"#1d4ed8":"#6b7280",fontWeight:tab==="notes"?500:400}} onClick={()=>setTab("notes")}>ЭОТ-анализ</button>
-        <button style={{padding:"2px 10px",fontSize:12,border:"none",background:"none",cursor:"pointer",fontFamily:"inherit",borderBottom:tab==="mak"?"2px solid #7c3aed":"2px solid transparent",color:tab==="mak"?"#5b21b6":"#6b7280",fontWeight:tab==="mak"?500:400}} onClick={()=>setTab("mak")}>МАК{mak&&<span className="chip cp" style={{marginLeft:5,fontSize:10}}>✓</span>}</button>
-      </div>
-      <span style={{fontSize:11,color:"#94a3b8"}}>{notes.length}</span>
-    </div>
-    <div className="panel-body">
-      {tab==="notes"&&<div>
-        {notes.length===0&&!lN&&<div className="empty"><i className="ti ti-notes"></i><p style={{fontSize:12}}>Заметки по 12 шагам ЭОТ появятся здесь</p></div>}
-        {lN&&<div style={{textAlign:"center",padding:16,color:"#64748b",fontSize:12}}><span className="spin"></span>Анализирую по ЭОТ...</div>}
-        {notes.map((n,i)=>(<div key={i} className="note-card"><div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><span style={{fontSize:11,color:"#94a3b8",fontWeight:500}}>{n.time}</span><span className={"chip "+(n.auto?"cb":"cg")}>{n.auto?"авто":"запрос"}</span></div><pre style={{whiteSpace:"pre-wrap",fontFamily:"inherit",fontSize:12,lineHeight:1.75,color:"#1e293b"}}>{n.content}</pre></div>))}
-        <div ref={endRef}></div>
-      </div>}
-      {tab==="mak"&&<div>
-        {!mak&&!lM&&<div className="empty"><i className="ti ti-cards"></i><p style={{fontSize:12,marginBottom:12}}>Когда запрос прояснён — составьте МАК-технику</p><button className="btn btn-mak" style={{fontSize:12}} onClick={onM} disabled={tr.length===0}><i className="ti ti-sparkles"></i>Составить технику</button></div>}
-        {lM&&<div style={{textAlign:"center",padding:16,color:"#7e22ce",fontSize:12}}><span className="spinp"></span>Составляю технику...</div>}
-        {mak&&<div><MakCard data={mak}/><button className="btn btn-mak" style={{fontSize:12,width:"100%"}} onClick={onM} disabled={lM}>Пересоставить</button></div>}
-      </div>}
-    </div>
-  </div>);
-}
-
-function LiveView({isRec,tr,notes,mak,interim,spk,setSpk,lN,lM,name,setName,auto,setAuto,onStart,onStop,onN,onM,onEnd,trEnd,sett,onSett}){
-  const[showEnd,setShowEnd]=useState(false);
-  const lastN=notes[notes.length-1];
-  const sm=lastN?.content?.match(/📍 ЭТАП[:\s]+([^\n]+)/);
-  const stage=sm?sm[1].trim():null;
-  const provNames={gemini:"Gemini",gigachat:"GigaChat",claude:"Claude",openai:"OpenAI"};
-  
-  return(<div>
-    <div className="topbar">
-      <div style={{display:"flex",alignItems:"center",gap:8}}>
-        {isRec&&<span className="rec-dot"></span>}
-        <input className="sname" value={name} onChange={e=>setName(e.target.value)} placeholder="Название сессии..."/>
-        {stage&&<span className="sbadge">{stage}</span>}
-      </div>
-      <div className="ctrls">
-        <button className="btn btn-outline" style={{padding:"4px 8px",fontSize:11}} onClick={onSett}>
-          <i className="ti ti-robot"></i> {provNames[sett.provider]||"Выбрать AI"}
-        </button>
-        {isRec?(<div style={{display:"flex",gap:6}}>
-          <div className="spk-tog"><button className={"spk-btn"+(spk==="Клиент"?" cl":"")} onClick={()=>setSpk("Клиент")}>Клиент</button><button className={"spk-btn"+(spk==="Психолог"?" ps":"")} onClick={()=>setSpk("Психолог")}>Психолог</button></div>
-          <button className="btn btn-outline" onClick={onN} disabled={lN||tr.length===0} style={{fontSize:12}}>{lN?<span className="spin"></span>:<><i className="ti ti-brain"></i>ЭОТ</>}</button>
-          <button className="btn btn-mak" onClick={onM} disabled={lM||tr.length===0} style={{fontSize:12}}>{lM?<span className="spinp"></span>:<><i className="ti ti-cards"></i>МАК</>}</button>
-          <button className="btn btn-danger" onClick={onStop} style={{fontSize:12}}><i className="ti ti-player-stop"></i>Стоп</button>
-        </div>):(<div>
-          <button className="btn btn-success" onClick={onStart}><i className="ti ti-player-play"></i>Начать запись</button>
-          {tr.length>0&&!showEnd&&<button className="btn btn-dark" style={{fontSize:12}} onClick={()=>setShowEnd(true)}>Завершить</button>}
-          {showEnd&&<div style={{display:"flex",gap:4,alignItems:"center"}}><span style={{fontSize:12,color:"#64748b"}}>Сохранить?</span><button className="btn btn-dark" style={{fontSize:12}} onClick={onEnd}>Да</button><button className="btn btn-outline" style={{fontSize:12}} onClick={()=>setShowEnd(false)}>Нет</button></div>}
-        </div>)}
-      </div>
-    </div>
-    <div style={{marginBottom:10,fontSize:12,color:"#94a3b8"}}>
-      <label style={{display:"inline-flex",alignItems:"center",gap:5,cursor:"pointer"}}><input type="checkbox" checked={auto} onChange={e=>setAuto(e.target.checked)}/>Авто-анализ каждые 60 сек</label>
-    </div>
-    <div className="two-col">
-      <div className="panel">
-        <div className="panel-hdr"><span style={{fontWeight:600,fontSize:13}}><i className="ti ti-align-left"></i> Транскрипт</span><span style={{fontSize:11,color:"#94a3b8"}}>{tr.length} реплик</span></div>
-        <div className="panel-body">
-          {tr.length===0&&!interim&&<div className="empty"><i className="ti ti-microphone-off"></i><p style={{fontSize:12}}>Нажмите «Начать запись»</p></div>}
-          {tr.map((t,i)=>(<div key={i} className={"ti-item "+(t.speaker==="Клиент"?"client":"psychologist")}>
-            <div style={{fontSize:10,color:"#94a3b8",marginBottom:2,fontWeight:600}}>{t.speaker} · {t.time}</div>
-            <div style={{fontSize:13,lineHeight:1.65}}>{t.text}</div>
-          </div>))}
-          {interim&&<div className="ti-item interim"><div style={{fontSize:10,color:"#cbd5e1",marginBottom:2}}>{spk} · сейчас</div><div style={{fontSize:13,color:"#94a3b8",fontStyle:"italic"}}>{interim}...</div></div>}
-          <div ref={trEnd}></div>
-        </div>
-      </div>
-      <NotesPanel notes={notes} mak={mak} lN={lN} lM={lM} tr={tr} onN={onN} onM={onM}/>
-    </div>
-  </div>);
-}
-
-function HomeView({sessions,onStart,onFile,onSelect,onDel}){
-  return(<div>
-    <h2>Добро пожаловать</h2>
-    <p className="sub">ЭОТ-анализ по 12 шагам + МАК-техника под запрос · Без сторонних платформ</p>
-    <div style={{display:"flex",gap:8,marginBottom:"1.5rem"}}>
-      <button className="btn btn-dark" onClick={onStart}><i className="ti ti-microphone"></i>Живая запись сессии</button>
-      <button className="btn btn-outline" onClick={onFile}><i className="ti ti-file-upload"></i>Загрузить аудиофайл</button>
-    </div>
-    <h3>История сессий</h3>
-    {sessions.length===0&&<div className="empty" style={{paddingTop:"1.5rem"}}><i className="ti ti-history"></i><p style={{fontSize:13}}>Сессий пока нет</p></div>}
-    {sessions.map(s=>(<div key={s.id} className="s-card" onClick={()=>onSelect(s)}>
-      <div>
-        <div style={{fontWeight:600,fontSize:14,marginBottom:2}}>{s.name}</div>
-        <div style={{color:"#94a3b8",fontSize:12}}>{fmtD(s.date)} · {s.transcript?.length||0} реплик</div>
-      </div>
-      <button className="btn btn-outline" style={{padding:"4px 8px",fontSize:12}} onClick={e=>{e.stopPropagation();onDel(s.id);}}><i className="ti ti-trash"></i></button>
-    </div>))}
-  </div>);
-}
-
-function FileView({onTextReady, sett}){
-  const[loading,setLoading]=useState(false);
-  const[status,setStatus]=useState("");
-  const[error,setError]=useState("");
-  const[resultText,setResultText]=useState("");
-
-  async function processAudioFile(file){
-    if(!file) return;
-    if(!sett || !sett.geminiKey){
-      setError("Для распознавания файлов укажите Gemini API Key в Настройках.");
-      return;
-    }
-    setLoading(true); setError("");
-    try {
-      const toBase64 = f => new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(f);
-        reader.onload = () => resolve(reader.result.split(',')[1]);
-        reader.onerror = e => reject(e);
-      });
-      const base64Data = await toBase64(file);
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${sett.geminiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { inlineData: { mimeType: file.type || "audio/mp3", data: base64Data } },
-              { text: "Сделай дословную транскрибацию этого аудиофайла на русском языке. Только текст." }
-            ]
-          }]
-        })
-      });
-      const d = await r.json();
-      const text = d.candidates?.[0]?.content?.parts?.[0]?.text;
-      if(onTextReady) onTextReady(text, file.name);
-      setLoading(false);
-    } catch (err) {
-      setError("Ошибка: " + err.message);
-      setLoading(false);
-    }
-  }
-
-  return(<div>
-    <h2>Обработка файла</h2>
-    <div className="card"><input type="file" accept="audio/*" onChange={e=>processAudioFile(e.target.files[0])} disabled={loading}/></div>
-  </div>);
-}
-
-function DetailView({session,onBack}){
-  return(<div>
-    <button className="btn btn-outline" style={{marginBottom:"1rem"}} onClick={onBack}><i className="ti ti-arrow-left"></i>Назад</button>
-    <h2>{session.name}</h2>
-  </div>);
-}
-
-function SettingsModal({sett,onSave,onClose}){
-  const[loc,setLoc]=useState({...sett});
-  const kf={openai:"openaiKey",gemini:"geminiKey",claude:"claudeKey",gigachat:"gigaKey"};
-  const cur=kf[loc.provider];
-  return(<div className="modal-bg" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-    <div className="modal">
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1.25rem"}}><h2 style={{fontSize:17}}>Настройки ИИ</h2><button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:22,color:"#94a3b8"}}>×</button></div>
-      <label className="fl">Выберите AI для работы:</label>
-      {[{id:"gemini",nm:"Gemini"},{id:"gigachat",nm:"GigaChat"},{id:"claude",nm:"Claude"},{id:"openai",nm:"OpenAI"}].map(p=>(<label key={p.id} className={"ri"+(loc.provider===p.id?" sel":"")}>
-        <input type="radio" name="prov" value={p.id} checked={loc.provider===p.id} onChange={()=>setLoc({...loc,provider:p.id})}/>
-        <span style={{fontSize:13}}>{p.nm}</span>
-      </label>))}
-      {cur&&<div style={{marginTop:"0.875rem"}}><label className="fl">Ваш ключ API:</label><input className="fi" type="password" value={loc[cur]||""} onChange={e=>setLoc({...loc,[cur]:e.target.value})}/></div>}
-      <button className="btn btn-dark" onClick={()=>{onSave(loc);onClose();}} style={{width:"100%"}}>Сохранить</button>
-    </div>
-  </div>);
-}
+const {useState} = React;
 
 function App(){
-  const[view,setView]=useState("home");
-  const[sessions,setSessions]=useState([]);
-  const[sett,setSett]=useState({provider:"gemini",claudeKey:"",openaiKey:"",geminiKey:"",gigaKey:""});
-  const[showSett,setShowSett]=useState(false);
-  const[sel,setSel]=useState(null);
-  const[isRec,setIsRec]=useState(false);
   const[tr,setTr]=useState([]);
   const[notes,setNotes]=useState([]);
-  const[mak,setMak]=useState(null);
-  const[spk,setSpk]=useState("Клиент");
-  const[auto,setAuto]=useState(true);
-  const[lN,setLN]=useState(false);
-  const[lM,setLM]=useState(false);
-  const[name,setName]=useState("");
-  const[interim,setInterim]=useState("");
-  const[fbLoading,setFbLoading]=useState(true);
-
-  useEffect(()=>{
-    fbLoad().then(d=>{setSessions(d);setFbLoading(false);});
-    fbLoadSett().then(d=>{if(d)setSett(s=>({...s,...d}));});
-  },[]);
-
-  async function doN(a=false){
-    if(tr.length===0||lN)return;
-    setLN(true);
-    try{const t=await ai(ESYS,"Транскрипт:\n\n"+tr.map(t=>t.speaker+": "+t.text).join("\n")+"\n\nДай заметки.",sett);setNotes(prev=>[...prev,{time:fmt(new Date()),content:t,auto:a}]);}catch(e){}
-    setLN(false);
-  }
-
-  async function doM(){
-    if(tr.length===0)return;
-    setLM(true);
-    try {
-      const raw = await ai(MSYS,"Транскрипт:\n\n"+tr.map(t=>t.speaker+": "+t.text).join("\n"),sett);
-      setMak(extractJSON(raw));
-    }catch(e){}
-    setLM(false);
-  }
+  const[isRec,setIsRec]=useState(false);
 
   function startRec(){
-    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-    const r=new SR();r.continuous=true;r.interimResults=true;r.lang="ru-RU";
-    r.onresult=e=>{
-      let itr="";
-      for(let i=e.resultIndex;i<e.results.length;i++){
-        if(e.results[i].isFinal){const t=clean(e.results[i][0].transcript.trim());if(t)setTr(prev=>[...prev,{speaker:spk,text:t,time:fmt(new Date())}]);setInterim("");}
-        else itr+=e.results[i][0].transcript;
-      }
-      setInterim(itr);
-    };
-    r.start();setIsRec(true);
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const r = new SR(); r.continuous = true; r.interimResults = true; r.lang = "ru-RU";
+    r.onresult = e => { const last = e.results[e.results.length-1]; if(last.isFinal) setTr(p=>[...p, {text: last[0].transcript}]); };
+    r.start(); setIsRec(true);
   }
 
-  function stopRec(){setIsRec(false);}
-
   return(<div>
-    <Sidebar view={view} setView={setView} isRec={isRec} onSett={()=>setShowSett(true)}/>
-    <div className="page">
-      {view==="home"&&<HomeView sessions={sessions} onStart={()=>{setTr([]);setView("live");}} onFile={()=>setView("file")} onSelect={s=>{setSel(s);setView("detail");}} onDel={fbDel}/>}
-      {view==="live"&&<LiveView isRec={isRec} tr={tr} notes={notes} mak={mak} interim={interim} spk={spk} setSpk={setSpk} lN={lN} lM={lM} name={name} setName={setName} auto={auto} setAuto={setAuto} onStart={startRec} onStop={stopRec} onN={()=>doN(false)} onM={doM} sett={sett} onSett={()=>setShowSett(true)}/>}
-      {view==="file"&&<FileView sett={sett}/>}
-      {view==="detail"&&sel&&<DetailView session={sel} onBack={()=>setView("home")}/>}
+    <div className="sidebar">
+      <div className="nav-logo">ЭОТ-Ассистент</div>
+      <button className="nav-btn" onClick={()=>window.location.reload()}>Главная</button>
     </div>
-    {showSett&&<SettingsModal sett={sett} onSave={async(s)=>{setSett(s);await fbSaveSett(s);}} onClose={()=>setShowSett(false)}/>}
+    <div className="page">
+      <h2>Сессия: Исследование обиды</h2>
+      <div style={{marginTop:20}}>
+        <button className={"btn "+(isRec?"btn-dark":"btn-success")} onClick={isRec?()=>window.location.reload():startRec}>
+          {isRec?"Остановить запись":"Начать запись"}
+        </button>
+      </div>
+      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:"20px"}}>
+        <div className="panel"><h3>Транскрипт</h3>{tr.map((t,i)=><p key={i} style={{marginBottom:8}}>{t.text}</p>)}</div>
+        <div className="panel"><h3>Анализ ИИ</h3>{notes.map((n,i)=><div key={i}>{n.text}</div>)}</div>
+      </div>
+    </div>
   </div>);
 }
-
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
 </body>
