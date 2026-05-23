@@ -147,7 +147,7 @@ async function ai(sys,user,sett){
   return"⚠️ Нужен API-ключ. Откройте Настройки.";
 }
 function Sidebar({view,setView,isRec,onSett}){
-  const items=[{id:"home",ic:"ti-layout-dashboard",lb:"Главная"},{id:"live",ic:"ti-microphone",lb:"Живая сессия"},{id:"file",ic:"ti-file-upload",lb:"Файл"}];
+  const items=[{id:"home",ic:"ti-layout-dashboard",lb:"Главная"},{id:"live",ic:"ti-microphone",lb:"Живая сессия"},{id:"file",ic:"ti-file-upload",lb:"Файл / Ссылка"}];
   return(<div className="sidebar">
     <div className="nav-logo"><div className="nav-logo-title">🧠 ЭОТ-Ассистент</div><div className="nav-logo-sub">транскрибатор · Юлия</div></div>
     {items.map(it=>(<button key={it.id} className={"nav-btn"+(view===it.id?" active":"")} onClick={()=>setView(it.id)}><i className={"ti "+it.ic}></i>{it.lb}{it.id==="live"&&isRec&&<span className="rec-dot" style={{marginLeft:"auto"}}></span>}</button>))}
@@ -288,7 +288,28 @@ function FileView({sett}){
 
   async function handleUrlSubmit(){
     if(!videoUrl.trim()) return;
-    setError("Для прямой загрузки по ссылкам YouTube/VK требуется настроить серверный скрипт на Vercel (Serverless Function). Браузер блокирует прямое скачивание видеопотоков из-за политики CORS, а нейросеть Whisper принимает только готовые файлы. Поля ввода подготовлены к интеграции бэкенда.");
+    if(!sett.openaiKey){setError("Нужен OpenAI API-ключ в Настройках для Whisper");return;}
+    setLoading(true);setError("");setResult(null);
+    try{
+      const r = await fetch("/api/transcribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: videoUrl,
+          openaiKey: sett.openaiKey,
+          vkKey: sett.vkKey
+        })
+      });
+      const d = await r.json();
+      if(d.error){
+        setError(d.error);
+      } else {
+        setResult({text: clean(d.text || ""), name: "Обработанное видео по ссылке"});
+      }
+    }catch(e){
+      setError(e.message);
+    }
+    setLoading(false);
   }
 
   return(<div>
@@ -297,20 +318,20 @@ function FileView({sett}){
     
     <div className="card">
       <p style={{fontWeight:600,fontSize:13,marginBottom:6}}><i className="ti ti-link" style={{marginRight:5}}></i>Импорт по ссылке (YouTube / ВКонтакте)</p>
-      <div style={{display:"flex",gap:8}}>
-        <input className="fi" style={{marginBottom:0}} type="text" placeholder="Вставьте ссылку на видео..." value={videoUrl} onChange={e=>setVideoUrl(e.target.value)}/>
-        <button className="btn btn-dark" onClick={handleUrlSubmit}>Загрузить</button>
+      <div style={{display:"flex",gap:8,marginBottom:6}}>
+        <input className="fi" style={{marginBottom:0}} type="text" placeholder="Вставьте ссылку на видео (например, vk.com/video... или youtube.com/...)" value={videoUrl} onChange={e=>setVideoUrl(e.target.value)}/>
+        <button className="btn btn-dark" onClick={handleUrlSubmit} disabled={loading}>Загрузить</button>
       </div>
-      {sett.vkKey ? <p style={{fontSize:11,color:"#166534",marginTop:6}}>✓ Ключ доступа VK подключен</p> : <p style={{fontSize:11,color:"#b45309",marginTop:6}}>⚠️ Для закрытых видео VK добавьте ключ доступа в Настройках</p>}
+      {sett.vkKey ? <p style={{fontSize:11,color:"#166534"}}>✓ Ключ доступа VK подключен</p> : <p style={{fontSize:11,color:"#b45309"}}>⚠️ Для приватных видео VK добавьте сервисный ключ в Настройках</p>}
     </div>
 
     <div className="card">
       <p style={{fontWeight:600,fontSize:13,marginBottom:6}}><i className="ti ti-file-upload" style={{marginRight:5}}></i>Локальный файл</p>
       <p style={{fontSize:12,color:"#94a3b8",marginBottom:10}}>MP3, MP4, M4A, WAV, OGG — до 25 МБ</p>
-      <input type="file" accept="audio/*,video/*" onChange={e=>handle(e.target.files[0])} style={{fontSize:13}}/>
+      <input type="file" accept="audio/*,video/*" onChange={e=>handle(e.target.files[0])} style={{fontSize:13}} disabled={loading}/>
     </div>
 
-    {loading&&<div style={{textAlign:"center",padding:"1.5rem",color:"#64748b",fontSize:13}}><span className="spin"></span>Транскрибирую...</div>}
+    {loading&&<div style={{textAlign:"center",padding:"1.5rem",color:"#64748b",fontSize:13}}><span className="spin"></span>Скачивание и транскрибация медиапотока...</div>}
     {error&&<div style={{padding:".875rem",background:"#fee2e2",borderRadius:8,color:"#991b1b",fontSize:13,marginTop:10}}>{error}</div>}
     {result&&<div style={{marginTop:"1rem"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
@@ -330,7 +351,7 @@ function DetailView({session,onBack}){
     <p className="sub">{fmtD(session.date)} · {session.transcript?.length||0} реплик</p>
     <div className="tabs">
       {["transcript","notes","mak"].map(t=>(<button key={t} className={"tab"+(tab===t?" on":"")} onClick={()=>setTab(t)}>{t==="transcript"?"Транскрипт":t==="notes"?"ЭОТ-заметки":"МАК-техника"}</button>))}
-      <button className="btn btn-outline" style={{marginLeft:"auto",fontSize:11,padding:"4px 10px"}} onClick={()=>navigator.clipboard.writeText(full)}><i className="ti ti-copy"></i>Копировать</button>
+      <button className="btn btn-outline" style={{marginLeft:"auto",fontSize:11,padding:"4px 10px"} onClick={()=>navigator.clipboard.writeText(full)}><i className="ti ti-copy"></i>Копировать</button>
     </div>
     {tab==="transcript"&&(session.transcript||[]).map((t,i)=>(<div key={i} className={"ti-item "+(t.speaker==="Клиент"?"client":"psychologist")}>
       <div style={{fontSize:10,color:"#94a3b8",marginBottom:2,fontWeight:600}}>{t.speaker} · {t.time}</div>
@@ -363,7 +384,7 @@ function SettingsModal({sett,onSave,onClose}){
       <div style={{marginTop:".5rem",borderTop:"0.5px solid #e2e8f0",paddingTop:".875rem"}}>
         <label className="fl">Сервисный ключ доступа ВКонтакте (VK API token)</label>
         <input className="fi" type="password" placeholder="vk1.a. ..." value={loc.vkKey||""} onChange={e=>setLoc({...loc,vkKey:e.target.value})}/>
-        <p style={{fontSize:11,color:"#94a3b8",marginTop:-8,marginBottom:".875rem"}}>Необходим для авторизации и доступа к вашим приватным видеозаписям.</p>
+        <p style={{fontSize:11,color:"#94a3b8",marginTop:-8,marginBottom:".875rem"}}>Используется для авторизации на сервере при обработке закрытых видеозаписей из ВК.</p>
       </div>
 
       <label className="fl" style={{marginTop:4}}>Язык распознавания</label>
