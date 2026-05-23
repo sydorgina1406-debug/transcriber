@@ -546,10 +546,12 @@ function App(){
     setView("live");
   }
 
+  async function saveSett(s){setSett(s);settRef.current=s;await fbSaveSett(s);}
+
   return(<div>
     <Sidebar view={view} setView={setView} isRec={isRec} onSett={()=>setShowSett(true)}/>
     <div className="page">
-      {fbLoading&&<div style={{textAlign:"center",padding:"3rem",color:"#94a3b8"}}><span className="spin"></span>Синхронизация кабинета...</div>}
+      {fbLoading&&<div style={{textAlign:"center",padding:"3rem",color:"#94a3b8"} && {display: "block"}}><span className="spin"></span>Синхронизация кабинета...</div>}
       {!fbLoading&& (
         <div>
           {view==="home"&&<HomeView sessions={sessions} onStart={()=>{setTr([]);setNotes([]);setMak(null);setView("live");}} onFile={()=>setView("file")} onSelect={s=>{setSel(s);setView("detail");}} onDel={delS}/>}
