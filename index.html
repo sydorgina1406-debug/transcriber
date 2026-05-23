@@ -155,6 +155,21 @@ const MSYS=`Методист по МАК. Составь авторскую те
 Структура:1-2 диагностика→2-3 исследование→1-2 трансформация. К каждой позиции 1-2 открытых вопроса(без почему). Название метафоричное. Стиль как у "Анатомия обиды".
 Верни ТОЛЬКО JSON без markdown:{"title":"...","request":"...","positions":[{"num":1,"title":"...","instruction":"...","questions":["...","..."]}]}`;
 
+// Вспомогательный извлекатель JSON-структур из произвольных ответов нейросетей
+function extractJSON(str) {
+  if (!str) return null;
+  const start = str.indexOf("{");
+  const end = str.lastIndexOf("}");
+  if (start !== -1 && end !== -1) {
+    try {
+      return JSON.parse(str.substring(start, end + 1));
+    } catch (e) {
+      throw new Error("Некорректная структура JSON в ответе: " + e.message);
+    }
+  }
+  throw new Error("Блок JSON не найден в ответе ИИ.");
+}
+
 async function ai(sys,user,sett){
   const p=sett.provider||"gemini";
   
@@ -518,8 +533,37 @@ function App(){
   async function doM(){
     if(trRef.current.length===0)return;
     setLM(true);
-    try{const raw=await ai(MSYS,"Транскрипт:\n\n"+trRef.current.map(t=>t.speaker+": "+t.text).join("\n")+"\n\nСоставь МАК-технику.",settRef.current);const parsed=JSON.parse(raw.replace(/```json|```/g,"").trim());setMak(parsed);}
-    catch(e){setMak({title:"Ошибка",request:"",positions:[{num:1,title:"Ошибка",instruction:String(e),questions:[]}]});}
+    try {
+      const raw = await ai(MSYS,"Транскрипт:\n\n"+trRef.current.map(t=>t.speaker+": "+t.text).join("\n")+"\n\nСоставь МАК-технику.",settRef.current);
+      
+      if (raw.startsWith("⚠️")) {
+        setMak({
+          title: "Требуется настройка",
+          request: "МАК-техника",
+          positions: [{
+            num: 1,
+            title: "Предупреждение",
+            instruction: raw.replace("⚠️", "").trim(),
+            questions: ["Перейдите в Настройки и проверьте API-ключи."]
+          }]
+        });
+      } else {
+        const parsed = extractJSON(raw);
+        setMak(parsed);
+      }
+    }
+    catch(e){
+      setMak({
+        title: "Не удалось получить МАК-технику",
+        request: "Ошибка распознавания или сети",
+        positions:[{
+          num: 1,
+          title: "Проблема генерации",
+          instruction: "ИИ не смог вернуть структурированный JSON. Возможно, API-ключ неактивен, закончились лимиты или выбран некорректный провайдер.",
+          questions: ["Текст ошибки: " + String(e.message || e)]
+        }]
+      });
+    }
     setLM(false);
   }
 
