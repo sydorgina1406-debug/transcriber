@@ -245,7 +245,7 @@ function HomeView({sessions,onStart,onFile,onSelect,onDel}){
     <p className="sub">ЭОТ-анализ по 12 шагам + МАК-техника под запрос · Firebase</p>
     <div style={{display:"flex",gap:8,marginBottom:"1.5rem"}}>
       <button className="btn btn-dark" onClick={onStart}><i className="ti ti-microphone"></i>Новая сессия</button>
-      <button className="btn btn-outline" onClick={onFile}><i className="ti ti-file-upload"></i>Файл</button>
+      <button className="btn btn-outline" onClick={onFile}><i className="ti ti-file-upload"></i>Файл / Ссылка</button>
     </div>
     <div style={{background:"#fdf4ff",border:"0.5px solid #e9d5ff",borderRadius:10,padding:".875rem",marginBottom:"1.5rem"}}>
       <p style={{fontWeight:600,fontSize:13,color:"#6b21a8",marginBottom:6}}><i className="ti ti-brain" style={{marginRight:5}}></i>AI понимает методологию Юлии:</p>
@@ -270,9 +270,11 @@ function FileView({sett}){
   const[loading,setLoading]=useState(false);
   const[result,setResult]=useState(null);
   const[error,setError]=useState("");
+  const[videoUrl,setVideoUrl]=useState("");
+
   async function handle(f){
     if(!f)return;
-    if(!sett.openaiKey){setError("Нужен OpenAI API-ключ в Настройках");return;}
+    if(!sett.openaiKey){setError("Нужен OpenAI API-ключ в Настройках для Whisper");return;}
     setLoading(true);setError("");setResult(null);
     try{
       const fd=new FormData();fd.append("file",f);fd.append("model","whisper-1");fd.append("language","ru");
@@ -283,18 +285,31 @@ function FileView({sett}){
     }catch(e){setError(e.message);}
     setLoading(false);
   }
+
+  async function handleUrlSubmit(){
+    if(!videoUrl.trim()) return;
+    setError("Для прямой загрузки по ссылкам YouTube/VK требуется настроить серверный скрипт на Vercel (Serverless Function). Браузер блокирует прямое скачивание видеопотоков из-за политики CORS, а нейросеть Whisper принимает только готовые файлы. Поля ввода подготовлены к интеграции бэкенда.");
+  }
+
   return(<div>
-    <h2>Файл</h2>
+    <h2>Файл или ссылка</h2>
     <p className="sub">Транскрибация через OpenAI Whisper</p>
+    
     <div className="card">
-      <p style={{fontWeight:600,fontSize:13,marginBottom:6}}><i className="ti ti-file-upload" style={{marginRight:5}}></i>Аудио/видео файл</p>
+      <p style={{fontWeight:600,fontSize:13,marginBottom:6}}><i className="ti ti-link" style={{marginRight:5}}></i>Импорт по ссылке (YouTube / ВКонтакте)</p>
+      <div style={{display:"flex",gap:8}}>
+        <input className="fi" style={{marginBottom:0}} type="text" placeholder="Вставьте ссылку на видео..." value={videoUrl} onChange={e=>setVideoUrl(e.target.value)}/>
+        <button className="btn btn-dark" onClick={handleUrlSubmit}>Загрузить</button>
+      </div>
+      {sett.vkKey ? <p style={{fontSize:11,color:"#166534",marginTop:6}}>✓ Ключ доступа VK подключен</p> : <p style={{fontSize:11,color:"#b45309",marginTop:6}}>⚠️ Для закрытых видео VK добавьте ключ доступа в Настройках</p>}
+    </div>
+
+    <div className="card">
+      <p style={{fontWeight:600,fontSize:13,marginBottom:6}}><i className="ti ti-file-upload" style={{marginRight:5}}></i>Локальный файл</p>
       <p style={{fontSize:12,color:"#94a3b8",marginBottom:10}}>MP3, MP4, M4A, WAV, OGG — до 25 МБ</p>
       <input type="file" accept="audio/*,video/*" onChange={e=>handle(e.target.files[0])} style={{fontSize:13}}/>
     </div>
-    <div className="card">
-      <p style={{fontWeight:600,fontSize:13,marginBottom:4}}><i className="ti ti-brand-youtube" style={{marginRight:5}}></i>YouTube / ВКонтакте</p>
-      <p style={{fontSize:12,color:"#94a3b8"}}>Скачайте аудио через <strong>yt-dlp</strong> и загрузите файл выше.</p>
-    </div>
+
     {loading&&<div style={{textAlign:"center",padding:"1.5rem",color:"#64748b",fontSize:13}}><span className="spin"></span>Транскрибирую...</div>}
     {error&&<div style={{padding:".875rem",background:"#fee2e2",borderRadius:8,color:"#991b1b",fontSize:13,marginTop:10}}>{error}</div>}
     {result&&<div style={{marginTop:"1rem"}}>
@@ -344,6 +359,13 @@ function SettingsModal({sett,onSave,onClose}){
         {loc.provider==="gemini"&&<p style={{fontSize:11,color:"#94a3b8",marginTop:-8,marginBottom:".875rem"}}>Ключ: <a href="https://aistudio.google.com/app/apikey" target="_blank" style={{color:"#3b82f6"}}>aistudio.google.com</a></p>}
         {loc.provider==="claude"&&<p style={{fontSize:11,color:"#94a3b8",marginTop:-8,marginBottom:".875rem"}}>Ключ: <a href="https://console.anthropic.com" target="_blank" style={{color:"#3b82f6"}}>console.anthropic.com</a></p>}
       </div>}
+      
+      <div style={{marginTop:".5rem",borderTop:"0.5px solid #e2e8f0",paddingTop:".875rem"}}>
+        <label className="fl">Сервисный ключ доступа ВКонтакте (VK API token)</label>
+        <input className="fi" type="password" placeholder="vk1.a. ..." value={loc.vkKey||""} onChange={e=>setLoc({...loc,vkKey:e.target.value})}/>
+        <p style={{fontSize:11,color:"#94a3b8",marginTop:-8,marginBottom:".875rem"}}>Необходим для авторизации и доступа к вашим приватным видеозаписям.</p>
+      </div>
+
       <label className="fl" style={{marginTop:4}}>Язык распознавания</label>
       <select className="fi" value={loc.lang||"ru-RU"} onChange={e=>setLoc({...loc,lang:e.target.value})}><option value="ru-RU">Русский</option><option value="en-US">English</option></select>
       <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
@@ -356,7 +378,7 @@ function SettingsModal({sett,onSave,onClose}){
 function App(){
   const[view,setView]=useState("home");
   const[sessions,setSessions]=useState([]);
-  const[sett,setSett]=useState({provider:"claude",claudeKey:"",openaiKey:"",geminiKey:"",lang:"ru-RU"});
+  const[sett,setSett]=useState({provider:"claude",claudeKey:"",openaiKey:"",geminiKey:"",vkKey:"",lang:"ru-RU"});
   const[showSett,setShowSett]=useState(false);
   const[sel,setSel]=useState(null);
   const[isRec,setIsRec]=useState(false);
