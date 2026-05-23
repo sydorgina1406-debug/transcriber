@@ -110,8 +110,23 @@ const {useState, useEffect, useRef} = React;
 
 const FILLER=/\b(ну+|вот+|эм+|э+м*|м+|аа+|эй|ой|ах|ох|блин|короче|типа|как бы|значит|понимаешь|слушай|в общем|ладно|собственно)\b[,.]?\s*/gi;
 const clean=t=>t.replace(FILLER,"").replace(/\s{2,}/g," ").trim();
-const fmt=d=>new Date(d).toLocaleTimeString("ru",{hour:"2-digit",minute:"2-digit"});
-const fmtD=d=>new Date(d).toLocaleDateString("ru",{day:"numeric",month:"long",year:"numeric"});
+
+// Безопасное форматирование времени
+const fmt=d=>{
+  if (!d) return "--:--";
+  const dateObj = new Date(d);
+  if (isNaN(dateObj.getTime())) return "--:--";
+  return dateObj.toLocaleTimeString("ru",{hour:"2-digit",minute:"2-digit"});
+};
+
+// Безопасное форматирование даты
+const fmtD=d=>{
+  if (!d) return "Дата неизвестна";
+  const dateObj = new Date(d);
+  if (isNaN(dateObj.getTime())) return "Некорректная дата";
+  return dateObj.toLocaleDateString("ru",{day:"numeric",month:"long",year:"numeric"});
+};
+
 const COLL="transcriber_sessions";
 
 async function fbLoad(){try{if(!db)return[];const s=await db.collection(COLL).orderBy("date","desc").limit(50).get();return s.docs.map(d=>({id:d.id,...d.data()}));}catch{return[];}}
@@ -299,7 +314,7 @@ function HomeView({sessions,onStart,onFile,onSelect,onDel}){
         <div style={{color:"#94a3b8",fontSize:12}}>{fmtD(s.date)} · {s.transcript?.length||0} реплик</div>
         <div style={{marginTop:6,display:"flex",gap:4,flexWrap:"wrap"}}>
           {s.notes?.length>0&&<span className="chip cg">{s.notes.length} ЭОТ</span>}
-          {s.mak&&<span className="chip cp">МАК: «{s.mak.title}»</span>}
+          {s.mak && typeof s.mak === "object" && s.mak.title && <span className="chip cp">МАК: «{s.mak.title}»</span>}
         </div>
       </div>
       <button className="btn btn-outline" style={{padding:"4px 8px",fontSize:12}} onClick={e=>{e.stopPropagation();onDel(s.id);}}><i className="ti ti-trash"></i></button>
@@ -534,6 +549,11 @@ function App(){
     setTr([]);setNotes([]);setMak(null);setName("");setView("home");
   }
 
+  async function delS(id){
+    setSessions(prev=>prev.filter(s=>s.id!==id));
+    await fbDel(id);
+  }
+
   function handleFileTextReady(extractedText, fileName){
     const chunks = extractedText.match(/[^.!?]+[.!?]+/g) || [extractedText];
     const simulatedTranscript = chunks.map((chunk, index) => ({
@@ -546,12 +566,27 @@ function App(){
     setView("live");
   }
 
-  async function saveSett(s){setSett(s);settRef.current=s;await fbSaveSett(s);}
+  const nav = (v) => {
+    if(v==="live" && view!=="live"){
+      setTr([]);setNotes([]);setMak(null);
+    }
+    setView(v);
+  };
+
+  const saveSett = async (s) => {
+    setSett(s);
+    settRef.current=s;
+    await fbSaveSett(s);
+  };
 
   return(<div>
-    <Sidebar view={view} setView={setView} isRec={isRec} onSett={()=>setShowSett(true)}/>
+    <Sidebar view={view} setView={nav} isRec={isRec} onSett={()=>setShowSett(true)}/>
     <div className="page">
-      {fbLoading&&<div style={{textAlign:"center",padding:"3rem",color:"#94a3b8"} && {display: "block"}}><span className="spin"></span>Синхронизация кабинета...</div>}
+      {fbLoading && (
+        <div style={{textAlign:"center",padding:"3rem",color:"#94a3b8",display:"block"}}>
+          <span className="spin"></span>Синхронизация кабинета...
+        </div>
+      )}
       {!fbLoading&& (
         <div>
           {view==="home"&&<HomeView sessions={sessions} onStart={()=>{setTr([]);setNotes([]);setMak(null);setView("live");}} onFile={()=>setView("file")} onSelect={s=>{setSel(s);setView("detail");}} onDel={delS}/>}
