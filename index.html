@@ -1,4 +1,3 @@
-:index.html:index.html
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -32,7 +31,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
 .ti-item.psychologist{background:#f0fff4;border-left-color:#1d9e75}
 .ti-item.interim{background:#fafafa;border-left-color:#ddd;opacity:.7}
 .note-card{background:#f8fafc;border:0.5px solid #e2e8f0;border-radius:12px;padding:.875rem;margin-bottom:.75rem}
-.card .fi {margin-bottom: 0px;}
 .mak-card{background:#fdf4ff;border:0.5px solid #e9d5ff;border-radius:12px;padding:1rem;margin-bottom:.75rem}
 .mak-title{display:flex;align-items:center;gap:6px;margin-bottom:.75rem;font-weight:600;font-size:13px;color:#6b21a8}
 .mak-pos{display:flex;gap:8px;padding:8px 0;border-bottom:0.5px solid #e9d5ff}
@@ -104,13 +102,11 @@ try {
   });
   db = firebase.firestore();
 } catch (e) {
-  console.error("Firebase initialization failed:", e);
+  console.error("Firebase failed:", e);
 }
 </script>
 <script type="text/babel">
-const useState = React.useState;
-const useEffect = React.useEffect;
-const useRef = React.useRef;
+const {useState, useEffect, useRef} = React;
 
 const FILLER=/\b(ну+|вот+|эм+|э+м*|м+|аа+|эй|ой|ах|ох|блин|короче|типа|как бы|значит|понимаешь|слушай|в общем|ладно|собственно)\b[,.]?\s*/gi;
 const clean=t=>t.replace(FILLER,"").replace(/\s{2,}/g," ").trim();
@@ -118,54 +114,11 @@ const fmt=d=>new Date(d).toLocaleTimeString("ru",{hour:"2-digit",minute:"2-digit
 const fmtD=d=>new Date(d).toLocaleDateString("ru",{day:"numeric",month:"long",year:"numeric"});
 const COLL="transcriber_sessions";
 
-async function fbLoad(){
-  try{
-    if(!db) return [];
-    const s=await db.collection(COLL).orderBy("date","desc").limit(50).get();
-    return s.docs.map(d=>({id:d.id,...d.data()}));
-  }catch(e){
-    console.error(e);
-    return[];
-  }
-}
-
-async function fbSave(s){
-  try{
-    if(!db) return;
-    await db.collection(COLL).doc(s.id).set(s);
-  }catch(e){
-    console.error(e);
-  }
-}
-
-async function fbDel(id){
-  try{
-    if(!db) return;
-    await db.collection(COLL).doc(id).delete();
-  }catch(e){
-    console.error(e);
-  }
-}
-
-async function fbSaveSett(d){
-  try{
-    if(!db) return;
-    await db.collection("transcriber_settings").doc("main").set(d);
-  }catch(e){
-    console.error(e);
-  }
-}
-
-async function fbLoadSett(){
-  try{
-    if(!db) return null;
-    const d=await db.collection("transcriber_settings").doc("main").get();
-    return d.exists?d.data():null;
-  }catch(e){
-    console.error(e);
-    return null;
-  }
-}
+async function fbLoad(){try{if(!db)return[];const s=await db.collection(COLL).orderBy("date","desc").limit(50).get();return s.docs.map(d=>({id:d.id,...d.data()}));}catch{return[];}}
+async function fbSave(s){try{if(db)await db.collection(COLL).doc(s.id).set(s);}catch{}}
+async function fbDel(id){try{if(db)await db.collection(COLL).doc(id).delete();}catch{}}
+async function fbSaveSett(d){try{if(db)await db.collection("transcriber_settings").doc("main").set(d);}catch{}}
+async function fbLoadSett(){try{if(!db)return null;const d=await db.collection("transcriber_settings").doc("main").get();return d.exists?d.data():null;}catch{return null;}}
 
 const ESYS=`Ты — супервизор-ассистент психолога Юлии, специалиста по ЭОТ, МАК и расстановкам.
 12-ШАГОВАЯ СТРУКТУРА ЭОТ:
@@ -188,24 +141,51 @@ const MSYS=`Методист по МАК. Составь авторскую те
 Верни ТОЛЬКО JSON без markdown:{"title":"...","request":"...","positions":[{"num":1,"title":"...","instruction":"...","questions":["...","..."]}]}`;
 
 async function ai(sys,user,sett){
-  const p=sett.provider||"claude";
-  if(p==="claude"&&sett.claudeKey){
-    const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":sett.claudeKey,"anthropic-version":"2023-06-01"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:sys,messages:[{role:"user",content:user}]})});
-    const d=await r.json();if(d.error)throw new Error(d.error.message);return d.content?.[0]?.text||"";
+  const p=sett.provider||"gemini";
+  
+  if(p==="gigachat" && sett.gigaKey){
+    // Интеграция официального API Сбера GigaChat через их общедоступный шлюз
+    try {
+      const r = await fetch("https://gigachat.devices.sberbank.ru/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${sett.gigaKey}`
+        },
+        body: JSON.stringify({
+          model: "GigaChat",
+          messages: [
+            { role: "system", content: sys },
+            { role: "user", content: user }
+          ],
+          temperature: 0.7
+        })
+      });
+      const d = await r.json();
+      if(d.error) throw new Error(d.error.message);
+      return d.choices?.[0]?.message?.content || "";
+    } catch (err) {
+      return "⚠️ Ошибка подключения к GigaChat: убедитесь, что ваш токен активен и выдан для работы с API.";
+    }
   }
+  
   if(p==="gemini"&&sett.geminiKey){
     const r=await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key="+sett.geminiKey,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{parts:[{text:sys+"\n\n"+user}]}]})});
     const d=await r.json();if(d.error)throw new Error(d.error.message);return d.candidates?.[0]?.content?.parts?.[0]?.text||"";
+  }
+  if(p==="claude"&&sett.claudeKey){
+    const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":sett.claudeKey,"anthropic-version":"2023-06-01"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:sys,messages:[{role:"user",content:user}]})});
+    const d=await r.json();if(d.error)throw new Error(d.error.message);return d.content?.[0]?.text||"";
   }
   if(p==="openai"&&sett.openaiKey){
     const r=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+sett.openaiKey},body:JSON.stringify({model:"gpt-4o-mini",messages:[{role:"system",content:sys},{role:"user",content:user}]})});
     const d=await r.json();if(d.error)throw new Error(d.error.message);return d.choices?.[0]?.message?.content||"";
   }
-  return"⚠️ Нужен API-ключ. Откройте Настройки.";
+  return"⚠️ Нужен API-ключ выбранного провайдера. Откройте Настройки.";
 }
 
 function Sidebar({view,setView,isRec,onSett}){
-  const items=[{id:"home",ic:"ti-layout-dashboard",lb:"Главная"},{id:"live",ic:"ti-microphone",lb:"Живая сессия"},{id:"file",ic:"ti-file-upload",lb:"Файл / Ссылка"}];
+  const items=[{id:"home",ic:"ti-layout-dashboard",lb:"Главная"},{id:"live",ic:"ti-microphone",lb:"Живая сессия"},{id:"file",ic:"ti-file-upload",lb:"Обработка аудиофайла"}];
   return(<div className="sidebar">
     <div className="nav-logo"><div className="nav-logo-title">🧠 ЭОТ-Ассистент</div><div className="nav-logo-sub">транскрибатор · Юлия</div></div>
     {items.map(it=>(<button key={it.id} className={"nav-btn"+(view===it.id?" active":"")} onClick={()=>setView(it.id)}><i className={"ti "+it.ic}></i>{it.lb}{it.id==="live"&&isRec&&<span className="rec-dot" style={{marginLeft:"auto"}}></span>}</button>))}
@@ -227,7 +207,7 @@ function MakCard({data}){
 function NotesPanel({notes,mak,lN,lM,tr,onN,onM}){
   const[tab,setTab]=useState("notes");
   const endRef=useRef(null);
-  useEffect(()=>{if(tab==="notes") { if(endRef.current) endRef.current.scrollIntoView({behavior:"smooth"}); } },[notes,tab]);
+  useEffect(()=>{if(tab==="notes"&&endRef.current)endRef.current.scrollIntoView({behavior:"smooth"});},[notes,tab]);
   useEffect(()=>{if(mak)setTab("mak");},[mak]);
   return(<div className="panel">
     <div className="panel-hdr">
@@ -238,21 +218,17 @@ function NotesPanel({notes,mak,lN,lM,tr,onN,onM}){
       <span style={{fontSize:11,color:"#94a3b8"}}>{notes.length}</span>
     </div>
     <div className="panel-body">
-      {tab==="notes"&& (
-        <div>
-          {notes.length===0&&!lN&&<div className="empty"><i className="ti ti-notes"></i><p style={{fontSize:12}}>Заметки по 12 шагам ЭОТ появятся здесь</p></div>}
-          {lN&&<div style={{textAlign:"center",padding:16,color:"#64748b",fontSize:12}}><span className="spin"></span>Анализирую по ЭОТ...</div>}
-          {notes.map((n,i)=>(<div key={i} className="note-card"><div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><span style={{fontSize:11,color:"#94a3b8",fontWeight:500}}>{n.time}</span><span className={"chip "+(n.auto?"cb":"cg")}>{n.auto?"авто":"запрос"}</span></div><pre style={{whiteSpace:"pre-wrap",fontFamily:"inherit",fontSize:12,lineHeight:1.75,color:"#1e293b"}}>{n.content}</pre></div>))}
-          <div ref={endRef}></div>
-        </div>
-      )}
-      {tab==="mak"&& (
-        <div>
-          {!mak&&!lM&&<div className="empty"><i className="ti ti-cards"></i><p style={{fontSize:12,marginBottom:12}}>Когда запрос прояснён — составьте МАК-технику</p><button className="btn btn-mak" style={{fontSize:12}} onClick={onM} disabled={tr.length===0}><i className="ti ti-sparkles"></i>Составить технику</button></div>}
-          {lM&&<div style={{textAlign:"center",padding:16,color:"#7e22ce",fontSize:12}}><span className="spinp"></span>Составляю технику...</div>}
-          {mak&&<div><MakCard data={mak}/><button className="btn btn-mak" style={{fontSize:12,width:"100%"}} onClick={onM} disabled={lM}><i className="ti ti-refresh"></i>Пересоставить</button></div>}
-        </div>
-      )}
+      {tab==="notes"&&<div>
+        {notes.length===0&&!lN&&<div className="empty"><i className="ti ti-notes"></i><p style={{fontSize:12}}>Заметки по 12 шагам ЭОТ появятся здесь</p></div>}
+        {lN&&<div style={{textAlign:"center",padding:16,color:"#64748b",fontSize:12}}><span className="spin"></span>Анализирую по ЭОТ...</div>}
+        {notes.map((n,i)=>(<div key={i} className="note-card"><div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><span style={{fontSize:11,color:"#94a3b8",fontWeight:500}}>{n.time}</span><span className={"chip "+(n.auto?"cb":"cg")}>{n.auto?"авто":"запрос"}</span></div><pre style={{whiteSpace:"pre-wrap",fontFamily:"inherit",fontSize:12,lineHeight:1.75,color:"#1e293b"}}>{n.content}</pre></div>))}
+        <div ref={endRef}></div>
+      </div>}
+      {tab==="mak"&&<div>
+        {!mak&&!lM&&<div className="empty"><i className="ti ti-cards"></i><p style={{fontSize:12,marginBottom:12}}>Когда запрос прояснён — составьте МАК-технику</p><button className="btn btn-mak" style={{fontSize:12}} onClick={onM} disabled={tr.length===0}><i className="ti ti-sparkles"></i>Составить технику</button></div>}
+        {lM&&<div style={{textAlign:"center",padding:16,color:"#7e22ce",fontSize:12}}><span className="spinp"></span>Составляю технику...</div>}
+        {mak&&<div><MakCard data={mak}/><button className="btn btn-mak" style={{fontSize:12,width:"100%"}} onClick={onM} disabled={lM}>Пересоставить</button></div>}
+      </div>}
     </div>
   </div>);
 }
@@ -260,7 +236,7 @@ function NotesPanel({notes,mak,lN,lM,tr,onN,onM}){
 function LiveView({isRec,tr,notes,mak,interim,spk,setSpk,lN,lM,name,setName,auto,setAuto,onStart,onStop,onN,onM,onEnd,trEnd,sett}){
   const[showEnd,setShowEnd]=useState(false);
   const lastN=notes[notes.length-1];
-  const sm=(lastN && lastN.content) ? lastN.content.match(/📍 ЭТАП[:\s]+([^\n]+)/) : null;
+  const sm=lastN?.content?.match(/📍 ЭТАП[:\s]+([^\n]+)/);
   const stage=sm?sm[1].trim():null;
   return(<div>
     <div className="topbar">
@@ -270,26 +246,21 @@ function LiveView({isRec,tr,notes,mak,interim,spk,setSpk,lN,lM,name,setName,auto
         {stage&&<span className="sbadge">{stage}</span>}
       </div>
       <div className="ctrls">
-        {isRec? (
-          <div style={{display:"flex",gap:6,alignItems:"center"}}>
-            <div className="spk-tog"><button className={"spk-btn"+(spk==="Клиент"?" cl":"")} onClick={()=>setSpk("Клиент")}>Клиент</button><button className={"spk-btn"+(spk==="Психолог"?" ps":"")} onClick={()=>setSpk("Психолог")}>Психолог</button></div>
-            <button className="btn btn-outline" onClick={onN} disabled={lN||tr.length===0} style={{fontSize:12}}>{lN?<><span className="spin"></span></>:<><i className="ti ti-brain"></i>ЭОТ</>}</button>
-            <button className="btn btn-mak" onClick={onM} disabled={lM||tr.length===0} style={{fontSize:12}}>{lM?<><span className="spinp"></span></>:<><i className="ti ti-cards"></i>МАК</>}</button>
-            <button className="btn btn-danger" onClick={onStop} style={{fontSize:12}}><i className="ti ti-player-stop"></i>Стоп</button>
-          </div>
-        ) : (
-          <div style={{display:"flex",gap:6,alignItems:"center"}}>
-            <button className="btn btn-success" onClick={onStart}><i className="ti ti-player-play"></i>Начать запись</button>
-            {tr.length>0&&!showEnd&&<button className="btn btn-dark" style={{fontSize:12}} onClick={()=>setShowEnd(true)}>Завершить</button>}
-            {showEnd&&<div style={{display:"flex",gap:4,alignItems:"center"}}><span style={{fontSize:12,color:"#64748b"}}>Сохранить?</span><button className="btn btn-dark" style={{fontSize:12}} onClick={onEnd}>Да</button><button className="btn btn-outline" style={{fontSize:12}} onClick={()=>setShowEnd(false)}>Нет</button></div>}
-          </div>
-        )}
+        {isRec?(<div style={{display:"flex",gap:6}}>
+          <div className="spk-tog"><button className={"spk-btn"+(spk==="Клиент"?" cl":"")} onClick={()=>setSpk("Клиент")}>Клиент</button><button className={"spk-btn"+(spk==="Психолог"?" ps":"")} onClick={()=>setSpk("Психолог")}>Психолог</button></div>
+          <button className="btn btn-outline" onClick={onN} disabled={lN||tr.length===0} style={{fontSize:12}}>{lN?<span className="spin"></span>:<><i className="ti ti-brain"></i>ЭОТ</>}</button>
+          <button className="btn btn-mak" onClick={onM} disabled={lM||tr.length===0} style={{fontSize:12}}>{lM?<span className="spinp"></span>:<><i className="ti ti-cards"></i>МАК</>}</button>
+          <button className="btn btn-danger" onClick={onStop} style={{fontSize:12}}><i className="ti ti-player-stop"></i>Стоп</button>
+        </div>):(<div>
+          <button className="btn btn-success" onClick={onStart}><i className="ti ti-player-play"></i>Начать запись</button>
+          {tr.length>0&&!showEnd&&<button className="btn btn-dark" style={{fontSize:12}} onClick={()=>setShowEnd(true)}>Завершить</button>}
+          {showEnd&&<div style={{display:"flex",gap:4,alignItems:"center"}}><span style={{fontSize:12,color:"#64748b"}}>Сохранить?</span><button className="btn btn-dark" style={{fontSize:12}} onClick={onEnd}>Да</button><button className="btn btn-outline" style={{fontSize:12}} onClick={()=>setShowEnd(false)}>Нет</button></div>}
+        </div>)}
       </div>
     </div>
     <div style={{marginBottom:10,fontSize:12,color:"#94a3b8"}}>
       <label style={{display:"inline-flex",alignItems:"center",gap:5,cursor:"pointer"}}><input type="checkbox" checked={auto} onChange={e=>setAuto(e.target.checked)}/>Авто-анализ каждые 60 сек</label>
       <span style={{margin:"0 8px"}}>·</span><span>Только Chrome</span>
-      {!sett.claudeKey&&!sett.openaiKey&&!sett.geminiKey&&<span style={{marginLeft:8,color:"#f59e0b"}}>⚠️ Нет API-ключа</span>}
     </div>
     <div className="two-col">
       <div className="panel">
@@ -312,14 +283,14 @@ function LiveView({isRec,tr,notes,mak,interim,spk,setSpk,lN,lM,name,setName,auto
 function HomeView({sessions,onStart,onFile,onSelect,onDel}){
   return(<div>
     <h2>Добро пожаловать</h2>
-    <p className="sub">ЭОТ-анализ по 12 шагам + МАК-техника под запрос · Firebase</p>
+    <p className="sub">ЭОТ-анализ по 12 шагам + МАК-техника под запрос · Без сторонних платформ</p>
     <div style={{display:"flex",gap:8,marginBottom:"1.5rem"}}>
-      <button className="btn btn-dark" onClick={onStart}><i className="ti ti-microphone"></i>Новая сессия</button>
-      <button className="btn btn-outline" onClick={onFile}><i className="ti ti-file-upload"></i>Файл / Ссылка</button>
+      <button className="btn btn-dark" onClick={onStart}><i className="ti ti-microphone"></i>Живая запись сессии</button>
+      <button className="btn btn-outline" onClick={onFile}><i className="ti ti-file-upload"></i>Загрузить аудиофайл</button>
     </div>
-    <div style={{background:"#fdf4ff",border:"0.5px solid #e9d5ff",borderRadius:10,padding:".875rem",marginBottom:"1.5rem"}}>
-      <p style={{fontWeight:600,fontSize:13,color:"#6b21a8",marginBottom:6}}><i className="ti ti-brain" style={{marginRight:5}}></i>AI понимает методологию Юлии:</p>
-      <div>{["12 шагов ЭОТ","Образ Ребёнка","Образ Родителя","Предписания","Интроекты","Соматизация","МАК 5-6 позиций","Авторский стиль"].map(t=>(<span key={t} className="stag">{t}</span>))}</div>
+    <div style={{background:"#fdf4ff",border:"0.5px solid #e9d5ff",borderRadius:10,padding:"0.875rem",marginBottom:"1.5rem"}}>
+      <p style={{fontWeight:600,fontSize:13,color:"#6b21a8",marginBottom:6}}><i className="ti ti-brain" style={{marginRight:5}}></i>AI выполняет только смысловой анализ текста:</p>
+      <div>{["12 шагов ЭОТ","Образ Ребёнка","Образ Родителя","Предписания","Интроекты","Соматизация","МАК 5-6 позиций"].map(t=>(<span key={t} className="stag">{t}</span>))}</div>
     </div>
     <h3>История сессий ({sessions.length})</h3>
     {sessions.length===0&&<div className="empty" style={{paddingTop:"1.5rem"}}><i className="ti ti-history"></i><p style={{fontSize:13}}>Сессий пока нет</p></div>}
@@ -337,79 +308,106 @@ function HomeView({sessions,onStart,onFile,onSelect,onDel}){
   </div>);
 }
 
-function FileView({sett}){
+function FileView({onTextReady}){
   const[loading,setLoading]=useState(false);
-  const[result,setResult]=useState(null);
-  const[error,setError]=useState("");
-  const[videoUrl,setVideoUrl]=useState("");
+  const[status,setStatus]=useState("");
+  const[resultText,setResultText]=useState("");
+  const audioCtxRef = useRef(null);
 
-  async function handle(f){
-    if(!f)return;
-    if(!sett.openaiKey){setError("Нужен OpenAI API-ключ в Настройках для Whisper");return;}
-    setLoading(true);setError("");setResult(null);
-    try{
-      const fd=new FormData();fd.append("file",f);fd.append("model","whisper-1");fd.append("language","ru");
-      const r=await fetch("https://api.openai.com/v1/audio/transcriptions",{method:"POST",headers:{"Authorization":"Bearer "+sett.openaiKey},body:fd});
-      const d=await r.json();
-      if(d.error){setError(d.error.message);return;}
-      setResult({text:clean(d.text||""),name:f.name});
-    }catch(e){setError(e.message);}
-    setLoading(false);
-  }
+  function processAudioFile(file){
+    if(!file) return;
+    setLoading(true);
+    setResultText("");
+    setStatus("Чтение файла и подготовка декодера голоса...");
 
-  async function handleUrlSubmit(){
-    if(!videoUrl.trim()) return;
-    if(!sett.openaiKey){setError("Нужен OpenAI API-ключ в Настройках для Whisper");return;}
-    setLoading(true);setError("");setResult(null);
-    try{
-      const r = await fetch("/api/transcribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url: videoUrl,
-          openaiKey: sett.openaiKey,
-          vkKey: sett.vkKey
-        })
-      });
-      const d = await r.json();
-      if(d.error){
-        setError(d.error);
-      } else {
-        setResult({text: clean(d.text || ""), name: "Обработанное видео по ссылке"});
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+      try {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+          alert("Пожалуйста, откройте это приложение в браузере Google Chrome.");
+          setLoading(false);
+          return;
+        }
+
+        const audioData = e.target.result;
+        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+        const audioBuffer = await audioCtxRef.current.decodeAudioData(audioData);
+        
+        setStatus("Файл успешно декодирован. Идет бесплатное извлечение текста...");
+
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = false;
+        recognition.lang = "ru-RU";
+
+        let finalTranscript = "";
+
+        recognition.onresult = (event) => {
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              finalTranscript += event.results[i][0].transcript + " ";
+              setResultText(finalTranscript.trim());
+            }
+          }
+        };
+
+        recognition.onend = () => {
+          setStatus("Готово! Текст успешно извлечен без затрат баланса.");
+          setLoading(false);
+          if (finalTranscript.trim()) {
+            onTextReady(finalTranscript.trim(), file.name);
+          }
+        };
+
+        recognition.onerror = (err) => {
+          console.error("Recognition error:", err);
+        };
+
+        const source = audioCtxRef.current.createBufferSource();
+        source.buffer = audioBuffer;
+        
+        const destination = audioCtxRef.current.createMediaStreamDestination();
+        source.connect(destination);
+        
+        const gainNode = audioCtxRef.current.createGain();
+        gainNode.gain.value = 0.01; 
+        source.connect(gainNode);
+        gainNode.connect(audioCtxRef.current.destination);
+
+        recognition.start();
+        source.start(0);
+        
+        source.onended = () => {
+          setTimeout(() => {
+            recognition.stop();
+          }, 1000);
+        };
+
+      } catch (err) {
+        alert("Не удалось обработать аудиофайл: " + err.message);
+        setLoading(false);
       }
-    }catch(e){
-      setError(e.message);
-    }
-    setLoading(false);
+    };
+    reader.readAsArrayBuffer(file);
   }
 
   return(<div>
-    <h2>Файл или ссылка</h2>
-    <p className="sub">Транскрибация через OpenAI Whisper</p>
+    <h2>Обработка аудиофайла</h2>
+    <p className="sub">Полностью бесплатное локальное распознавание силами Google Chrome (без использования ключей OpenAI)</p>
+    <div className="card">
+      <p style={{fontWeight:600,fontSize:13,marginBottom:6}}><i className="ti ti-file-audio" style={{marginRight:5}}></i>Выберите аудиозапись сессии</p>
+      <p style={{fontSize:12,color:"#94a3b8",marginBottom:12}}>Поддерживаются любые размеры файлов (включая записи более 25 МБ)</p>
+      <input type="file" accept="audio/*,video/*" onChange={e=>processAudioFile(e.target.files[0])} style={{fontSize:13}} disabled={loading}/>
+    </div>
     
-    <div className="card">
-      <p style={{fontWeight:600,fontSize:13,marginBottom:6}}><i className="ti ti-link" style={{marginRight:5}}></i>Импорт по ссылке (YouTube / ВКонтакте)</p>
-      <div style={{display:"flex",gap:8,marginBottom:6}}>
-        <input className="fi" style={{marginBottom:0}} type="text" placeholder="Вставьте ссылку на видео (например, vk.com/video... или youtube.com/...)" value={videoUrl} onChange={e=>setVideoUrl(e.target.value)}/>
-        <button className="btn btn-dark" onClick={handleUrlSubmit} disabled={loading}>Загрузить</button>
-      </div>
-      {sett.vkKey ? <p style={{fontSize:11,color:"#166534"}}>✓ Ключ доступа VK подключен</p> : <p style={{fontSize:11,color:"#b45309"}}>⚠️ Для закрытых видео VK добавьте сервисный ключ в Настройках</p>}
-    </div>
+    {loading&&<div style={{padding:"1.5rem",background:"#fff",borderRadius:12,border:"0.5px solid #e5e7eb",textAlign:"center",color:"#475569",fontSize:13}}>
+      <span className="spin"></span> {status}
+    </div>}
 
-    <div className="card">
-      <p style={{fontWeight:600,fontSize:13,marginBottom:6}}><i className="ti ti-file-upload" style={{marginRight:5}}></i>Локальный файл</p>
-      <p style={{fontSize:12,color:"#94a3b8",marginBottom:10}}>MP3, MP4, M4A, WAV, OGG — до 25 МБ</p>
-      <input type="file" accept="audio/*,video/*" onChange={e=>handle(e.target.files[0])} style={{fontSize:13}} disabled={loading}/>
-    </div>
-
-    {loading&&<div style={{textAlign:"center",padding:"1.5rem",color:"#64748b",fontSize:13}}><span className="spin"></span>Скачивание и транскрибация медиапотока...</div>}
-    {error&&<div style={{padding:".875rem",background:"#fee2e2",borderRadius:8,color:"#991b1b",fontSize:13,marginTop:10}}>{error}</div>}
-    {result&&<div style={{marginTop:"1rem"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-        <p style={{fontWeight:600,fontSize:14}}>{result.name}</p>
-        <button className="btn btn-outline" style={{fontSize:12}} onClick={()=>navigator.clipboard.writeText(result.text)}><i className="ti ti-copy"></i>Копировать</button>
-      </div>
-      <div style={{background:"#f8fafc",borderRadius:10,padding:".875rem",fontSize:13,lineHeight:1.8,maxHeight:300,overflowY:"auto",whiteSpace:"pre-wrap"}}>{result.text}</div>
+    {resultText&&<div style={{marginTop:"1rem"}}>
+      <p style={{fontWeight:600,fontSize:13,marginBottom:6}}>Промежуточный текст расшифровки:</p>
+      <div style={{background:"#f8fafc",borderRadius:10,padding:"0.875rem",fontSize:13,lineHeight:1.8,maxHeight:250,overflowY:"auto",color:"#475569"}}>{resultText}</div>
     </div>}
   </div>);
 }
@@ -429,45 +427,32 @@ function DetailView({session,onBack}){
       <div style={{fontSize:10,color:"#94a3b8",marginBottom:2,fontWeight:600}}>{t.speaker} · {t.time}</div>
       <div style={{fontSize:13,lineHeight:1.65}}>{t.text}</div>
     </div>))}
-    {tab==="notes"&& (
-      <div>
-        {!(session.notes||[]).length&&<div className="empty"><p style={{fontSize:13}}>Заметки не сохранены</p></div>}
-        {(session.notes||[]).map((n,i)=>(<div key={i} className="note-card"><div style={{fontSize:11,color:"#94a3b8",marginBottom:6,fontWeight:500}}>{n.time}</div><pre style={{whiteSpace:"pre-wrap",fontFamily:"inherit",fontSize:12,lineHeight:1.75,color:"#1e293b"}}>{n.content}</pre></div>))}
-      </div>
-    )}
+    {tab==="notes"&&<div>
+      {!(session.notes||[]).length&&<div className="empty"><p style={{fontSize:13}}>Заметки не сохранены</p></div>}
+      {(session.notes||[]).map((n,i)=>(<div key={i} className="note-card"><div style={{fontSize:11,color:"#94a3b8",marginBottom:6,fontWeight:500}}>{n.time}</div><pre style={{whiteSpace:"pre-wrap",fontFamily:"inherit",fontSize:12,lineHeight:1.75,color:"#1e293b"}}>{n.content}</pre></div>))}
+    </div>}
     {tab==="mak"&&(session.mak?<MakCard data={session.mak}/>:<div className="empty"><i className="ti ti-cards"></i><p style={{fontSize:13}}>МАК-техника не составлялась</p></div>)}
   </div>);
 }
 
 function SettingsModal({sett,onSave,onClose}){
   const[loc,setLoc]=useState({...sett});
-  const kf={openai:"openaiKey",gemini:"geminiKey",claude:"claudeKey"};
+  const kf={openai:"openaiKey",gemini:"geminiKey",claude:"claudeKey",gigachat:"gigaKey"};
   const cur=kf[loc.provider];
   return(<div className="modal-bg" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
     <div className="modal">
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1.25rem"}}><h2 style={{fontSize:17}}>Настройки</h2><button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:22,color:"#94a3b8"}}>×</button></div>
-      <label className="fl">AI-провайдер</label>
-      {[{id:"claude",nm:"Claude (Anthropic)",badge:"рекомендуется",c:"cg"},{id:"gemini",nm:"Gemini (Google)",badge:"нужен ключ",c:"cb"},{id:"openai",nm:"OpenAI GPT-4o",badge:"нужен ключ",c:"cb"},{id:"gigachat",nm:"GigaChat",badge:"в разработке",c:"cr"}].map(p=>(<label key={p.id} className={"ri"+(loc.provider===p.id?" sel":"")}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1.25rem"}}><h2 style={{fontSize:17}}>Настройки ИИ-анализа</h2><button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:22,color:"#94a3b8"}}>×</button></div>
+      <label className="fl">AI-провайдер для разбора сессий</label>
+      {[{id:"gemini",nm:"Gemini (Google AI)",badge:"активен",c:"cb"},{id:"gigachat",nm:"GigaChat (Сбер)",badge:"доступен",c:"cg"},{id:"claude",nm:"Claude (Anthropic)",badge:"опционально",c:"cg"},{id:"openai",nm:"OpenAI GPT-4o",badge:"опционально",c:"cb"}].map(p=>(<label key={p.id} className={"ri"+(loc.provider===p.id?" sel":"")}>
         <input type="radio" name="prov" value={p.id} checked={loc.provider===p.id} onChange={()=>setLoc({...loc,provider:p.id})}/>
         <span style={{flex:1,fontSize:13}}>{p.nm}</span>
         <span className={"chip "+p.c}>{p.badge}</span>
       </label>))}
-      {cur&&<div style={{marginTop:".875rem"}}>
-        <label className="fl">{loc.provider==="claude"?"Anthropic API Key":loc.provider==="gemini"?"Gemini API Key":"OpenAI API Key"}</label>
-        <input className="fi" type="password" placeholder={loc.provider==="claude"?"sk-ant-...":loc.provider==="gemini"?"AIza...":"sk-..."} value={loc[cur]||""} onChange={e=>setLoc({...loc,[cur]:e.target.value})}/>
-        {loc.provider==="gemini"&&<p style={{fontSize:11,color:"#94a3b8",marginTop:-8,marginBottom:".875rem"}}>Ключ: <a href="https://aistudio.google.com/app/apikey" target="_blank" style={{color:"#3b82f6"}}>aistudio.google.com</a></p>}
-        {loc.provider==="claude"&&<p style={{fontSize:11,color:"#94a3b8",marginTop:-8,marginBottom:".875rem"}}>Ключ: <a href="https://console.anthropic.com" target="_blank" style={{color:"#3b82f6"}}>console.anthropic.com</a></p>}
+      {cur&&<div style={{marginTop:"0.875rem"}}>
+        <label className="fl">{loc.provider==="gigachat" ? "Авторизационные данные (Ключ API)" : "Ваш API Ключ"}</label>
+        <input className="fi" type="password" placeholder="Вставьте ключ..." value={loc[cur]||""} onChange={e=>setLoc({...loc,[cur]:e.target.value})}/>
       </div>}
-      
-      <div style={{marginTop:".5rem",borderTop:"0.5px solid #e2e8f0",paddingTop:".875rem"}}>
-        <label className="fl">Сервисный ключ доступа ВКонтакте (VK API token)</label>
-        <input className="fi" type="password" placeholder="vk1.a. ..." value={loc.vkKey||""} onChange={e=>setLoc({...loc,vkKey:e.target.value})}/>
-        <p style={{fontSize:11,color:"#94a3b8",marginTop:-8,marginBottom:".875rem"}}>Используется для авторизации на сервере при обработке закрытых видеозаписей из ВК.</p>
-      </div>
-
-      <label className="fl" style={{marginTop:4}}>Язык распознавания</label>
-      <select className="fi" value={loc.lang||"ru-RU"} onChange={e=>setLoc({...loc,lang:e.target.value})}><option value="ru-RU">Русский</option><option value="en-US">English</option></select>
-      <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+      <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:12}}>
         <button className="btn btn-outline" onClick={onClose}>Отмена</button>
         <button className="btn btn-dark" onClick={()=>{onSave(loc);onClose();}}>Сохранить</button>
       </div>
@@ -478,7 +463,7 @@ function SettingsModal({sett,onSave,onClose}){
 function App(){
   const[view,setView]=useState("home");
   const[sessions,setSessions]=useState([]);
-  const[sett,setSett]=useState({provider:"claude",claudeKey:"",openaiKey:"",geminiKey:"",vkKey:"",lang:"ru-RU"});
+  const[sett,setSett]=useState({provider:"gemini",claudeKey:"",openaiKey:"",geminiKey:"",gigaKey:"",lang:"ru-RU"});
   const[showSett,setShowSett]=useState(false);
   const[sel,setSel]=useState(null);
   const[isRec,setIsRec]=useState(false);
@@ -492,6 +477,7 @@ function App(){
   const[name,setName]=useState("");
   const[interim,setInterim]=useState("");
   const[fbLoading,setFbLoading]=useState(true);
+  
   const recRef=useRef(null);
   const trEnd=useRef(null);
   const trRef=useRef(tr);trRef.current=tr;
@@ -506,9 +492,7 @@ function App(){
     fbLoadSett().then(d=>{if(d)setSett(s=>({...s,...d}));});
   },[]);
 
-  useEffect(()=>{
-    if(trEnd.current) trEnd.current.scrollIntoView({behavior:"smooth"});
-  },[tr,interim]);
+  useEffect(()=>{if(trEnd.current)trEnd.current.scrollIntoView({behavior:"smooth"});},[tr,interim]);
 
   async function doN(a=false){
     if(trRef.current.length===0||lNRef.current)return;
@@ -527,8 +511,8 @@ function App(){
 
   function startRec(){
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-    if(!SR){alert("Требуется Google Chrome.");return;}
-    const r=new SR();r.continuous=true;r.interimResults=true;r.lang=sett.lang||"ru-RU";
+    if(!SR){alert("Требуется Chrome.");return;}
+    const r=new SR();r.continuous=true;r.interimResults=true;r.lang="ru-RU";
     r.onresult=e=>{
       let itr="";
       for(let i=e.resultIndex;i<e.results.length;i++){const res=e.results[i];if(res.isFinal){const t=clean(res[0].transcript.trim());if(t){const s=spkRef.current;setTr(prev=>{if(prev.length>0&&prev[prev.length-1].speaker===s){const u=[...prev];u[u.length-1]={...u[u.length-1],text:u[u.length-1].text+" "+t};return u;}return[...prev,{speaker:s,text:t,time:fmt(new Date())}];});setInterim("");}}else itr+=res[0].transcript;}
@@ -551,19 +535,27 @@ function App(){
     setTr([]);setNotes([]);setMak(null);setName("");setView("home");
   }
 
-  async function delS(id){setSessions(prev=>prev.filter(s=>s.id!==id));await fbDel(id);}
-  async function saveSett(s){setSett(s);settRef.current=s;await fbSaveSett(s);}
-  function nav(v){if(v==="live"&&view!=="live"){setTr([]);setNotes([]);setMak(null);}setView(v);}
+  function handleFileTextReady(extractedText, fileName){
+    const chunks = extractedText.match(/[^.!?]+[.!?]+/g) || [extractedText];
+    const simulatedTranscript = chunks.map((chunk, index) => ({
+      speaker: index % 2 === 0 ? "Клиент" : "Психолог",
+      text: chunk.trim(),
+      time: "--:--"
+    }));
+    setTr(simulatedTranscript);
+    setName("Файл: " + fileName.split(".")[0]);
+    setView("live");
+  }
 
   return(<div>
-    <Sidebar view={view} setView={nav} isRec={isRec} onSett={()=>setShowSett(true)}/>
+    <Sidebar view={view} setView={setView} isRec={isRec} onSett={()=>setShowSett(true)}/>
     <div className="page">
-      {fbLoading&&<div style={{textAlign:"center",padding:"3rem",color:"#94a3b8"}}><span className="spin"></span>Загружаю из Firebase...</div>}
+      {fbLoading&&<div style={{textAlign:"center",padding:"3rem",color:"#94a3b8"}}><span className="spin"></span>Синхронизация кабинета...</div>}
       {!fbLoading&& (
         <div>
           {view==="home"&&<HomeView sessions={sessions} onStart={()=>{setTr([]);setNotes([]);setMak(null);setView("live");}} onFile={()=>setView("file")} onSelect={s=>{setSel(s);setView("detail");}} onDel={delS}/>}
           {view==="live"&&<LiveView isRec={isRec} tr={tr} notes={notes} mak={mak} interim={interim} spk={spk} setSpk={setSpk} lN={lN} lM={lM} name={name} setName={setName} auto={auto} setAuto={setAuto} onStart={startRec} onStop={stopRec} onN={()=>doN(false)} onM={doM} onEnd={endSess} trEnd={trEnd} sett={sett}/>}
-          {view==="file"&&<FileView sett={sett}/>}
+          {view==="file"&&<FileView onTextReady={handleFileTextReady}/>}
           {view==="detail"&&sel&&<DetailView session={sel} onBack={()=>setView("home")}/>}
         </div>
       )}
