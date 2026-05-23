@@ -199,7 +199,7 @@ async function ai(sys,user,sett){
   }
   
   if(p==="gemini"&&sett.geminiKey){
-    const r=await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key="+sett.geminiKey,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{parts:[{text:sys+"\n\n"+user}]}]})});
+    const r=await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key="+sett.geminiKey,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{parts:[{text:sys+"\n\n"+user}]}]})});
     const d=await r.json();if(d.error)throw new Error(d.error.message);return d.candidates?.[0]?.content?.parts?.[0]?.text||"";
   }
   if(p==="claude"&&sett.claudeKey){
@@ -337,105 +337,91 @@ function HomeView({sessions,onStart,onFile,onSelect,onDel}){
   </div>);
 }
 
-function FileView({onTextReady}){
+function FileView({onTextReady, sett}){
   const[loading,setLoading]=useState(false);
   const[status,setStatus]=useState("");
+  const[error,setError]=useState("");
   const[resultText,setResultText]=useState("");
-  const audioCtxRef = useRef(null);
 
-  function processAudioFile(file){
+  async function processAudioFile(file){
     if(!file) return;
+    if(!sett || !sett.geminiKey){
+      setError("Для бесплатной транскрибации аудиофайлов укажите ваш Gemini API Key в Настройках.");
+      return;
+    }
     setLoading(true);
+    setError("");
     setResultText("");
-    setStatus("Чтение файла и подготовка декодера голоса...");
+    setStatus("Чтение файла и кодирование звука...");
 
-    const reader = new FileReader();
-    reader.onload = async function(e) {
-      try {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-          alert("Пожалуйста, откройте это приложение в браузере Google Chrome.");
-          setLoading(false);
-          return;
-        }
+    try {
+      const toBase64 = f => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(f);
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = e => reject(e);
+      });
 
-        const audioData = e.target.result;
-        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
-        const audioBuffer = await audioCtxRef.current.decodeAudioData(audioData);
-        
-        setStatus("Файл успешно декодирован. Идет бесплатное извлечение текста...");
+      const base64Data = await toBase64(file);
+      setStatus("Отправка файла в Gemini AI для мгновенного и бесшумного распознавания...");
 
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = false;
-        recognition.lang = "ru-RU";
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${sett.geminiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { inlineData: { mimeType: file.type || "audio/mp3", data: base64Data } },
+              { text: "Пожалуйста, сделай максимально точную, подробную дословную транскрибацию (расшифровку) этого аудиофайла на русском языке. Разделяй текст на логические абзацы. Выведи только полученный текст, без каких-либо твоих комментариев или вводных фраз." }
+            ]
+          }]
+        })
+      });
 
-        let finalTranscript = "";
-
-        recognition.onresult = (event) => {
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              finalTranscript += event.results[i][0].transcript + " ";
-              setResultText(finalTranscript.trim());
-            }
-          }
-        };
-
-        recognition.onend = () => {
-          setStatus("Готово! Текст успешно извлечен без затрат баланса.");
-          setLoading(false);
-          if (finalTranscript.trim()) {
-            onTextReady(finalTranscript.trim(), file.name);
-          }
-        };
-
-        recognition.onerror = (err) => {
-          console.error("Recognition error:", err);
-        };
-
-        const source = audioCtxRef.current.createBufferSource();
-        source.buffer = audioBuffer;
-        
-        const destination = audioCtxRef.current.createMediaStreamDestination();
-        source.connect(destination);
-        
-        const gainNode = audioCtxRef.current.createGain();
-        gainNode.gain.value = 0.01; 
-        source.connect(gainNode);
-        gainNode.connect(audioCtxRef.current.destination);
-
-        recognition.start();
-        source.start(0);
-        
-        source.onended = () => {
-          setTimeout(() => {
-            recognition.stop();
-          }, 1000);
-        };
-
-      } catch (err) {
-        alert("Не удалось обработать аудиофайл: " + err.message);
-        setLoading(false);
+      if (!r.ok) {
+        const errData = await r.json();
+        throw new Error(errData.error?.message || "Ошибка сервера Gemini");
       }
-    };
-    reader.readAsArrayBuffer(file);
+
+      const d = await r.json();
+      const text = d.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!text) {
+        throw new Error("Не удалось получить текст от ИИ. Проверьте правильность API-ключа.");
+      }
+
+      setResultText(text);
+      setStatus("Транскрибация успешно завершена!");
+      setLoading(false);
+      
+      if (onTextReady) {
+        onTextReady(text, file.name);
+      }
+
+    } catch (err) {
+      console.error(err);
+      setError("Ошибка транскрибации: " + err.message);
+      setLoading(false);
+    }
   }
 
   return(<div>
     <h2>Обработка аудиофайла</h2>
-    <p className="sub">Полностью бесплатное локальное распознавание силами Google Chrome (без использования ключей OpenAI)</p>
+    <p className="sub">Полностью бесплатное, бесшумное и быстрое распознавание с помощью искусственного интеллекта Gemini (без VPN и без платных ключей OpenAI)</p>
     <div className="card">
       <p style={{fontWeight:600,fontSize:13,marginBottom:6}}><i className="ti ti-file-audio" style={{marginRight:5}}></i>Выберите аудиозапись сессии</p>
-      <p style={{fontSize:12,color:"#94a3b8",marginBottom:12}}>Поддерживаются любые размеры файлов (включая записи более 25 МБ)</p>
-      <input type="file" accept="audio/*,video/*" onChange={e=>processAudioFile(e.target.files[0])} style={{fontSize:13}} disabled={loading}/>
+      <p style={{fontSize:12,color:"#94a3b8",marginBottom:12}}>Поддерживаются MP3, WAV, AAC, M4A файлы объемом до 15-20 МБ.</p>
+      <input type="file" accept="audio/*" onChange={e=>processAudioFile(e.target.files[0])} style={{fontSize:13}} disabled={loading}/>
     </div>
     
     {loading&&<div style={{padding:"1.5rem",background:"#fff",borderRadius:12,border:"0.5px solid #e5e7eb",textAlign:"center",color:"#475569",fontSize:13}}>
       <span className="spin"></span> {status}
     </div>}
 
+    {error&&<div style={{padding:".875rem",background:"#fee2e2",borderRadius:8,color:"#991b1b",fontSize:13,marginTop:10}}>{error}</div>}
+
     {resultText&&<div style={{marginTop:"1rem"}}>
-      <p style={{fontWeight:600,fontSize:13,marginBottom:6}}>Промежуточный текст расшифровки:</p>
+      <p style={{fontWeight:600,fontSize:13,marginBottom:6}}>Результат расшифровки:</p>
       <div style={{background:"#f8fafc",borderRadius:10,padding:"0.875rem",fontSize:13,lineHeight:1.8,maxHeight:250,overflowY:"auto",color:"#475569"}}>{resultText}</div>
     </div>}
   </div>);
@@ -452,7 +438,7 @@ function DetailView({session,onBack}){
       {["transcript","notes","mak"].map(t=>(<button key={t} className={"tab"+(tab===t?" on":"")} onClick={()=>setTab(t)}>{t==="transcript"?"Транскрипт":t==="notes"?"ЭОТ-заметки":"МАК-техника"}</button>))}
       <button className="btn btn-outline" style={{marginLeft:"auto",fontSize:11,padding:"4px 10px"}} onClick={()=>navigator.clipboard.writeText(full)}><i className="ti ti-copy"></i>Копировать</button>
     </div>
-    {tab==="transcript"&&(session.transcript||[]).map((t,i)=>(<div key={i} className={"ti-item "+(t.speaker==="Клиент"?"client":"psychologist")}>
+    {tab==="transcript"&&(session.transcript||[]).map((t,i)=>(<div key={i} className={"ti-item "+(t.speaker==="Client"?"client":"psychologist")}>
       <div style={{fontSize:10,color:"#94a3b8",marginBottom:2,fontWeight:600}}>{t.speaker} · {t.time}</div>
       <div style={{fontSize:13,lineHeight:1.65}}>{t.text}</div>
     </div>))}
@@ -635,7 +621,7 @@ function App(){
         <div>
           {view==="home"&&<HomeView sessions={sessions} onStart={()=>{setTr([]);setNotes([]);setMak(null);setView("live");}} onFile={()=>setView("file")} onSelect={s=>{setSel(s);setView("detail");}} onDel={delS}/>}
           {view==="live"&&<LiveView isRec={isRec} tr={tr} notes={notes} mak={mak} interim={interim} spk={spk} setSpk={setSpk} lN={lN} lM={lM} name={name} setName={setName} auto={auto} setAuto={setAuto} onStart={startRec} onStop={stopRec} onN={()=>doN(false)} onM={doM} onEnd={endSess} trEnd={trEnd} sett={sett}/>}
-          {view==="file"&&<FileView onTextReady={handleFileTextReady}/>}
+          {view==="file"&&<FileView onTextReady={handleFileTextReady} sett={sett}/>}
           {view==="detail"&&sel&&<DetailView session={sel} onBack={()=>setView("home")}/>}
         </div>
       )}
