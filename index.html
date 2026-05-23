@@ -31,6 +31,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
 .ti-item.psychologist{background:#f0fff4;border-left-color:#1d9e75}
 .ti-item.interim{background:#fafafa;border-left-color:#ddd;opacity:.7}
 .note-card{background:#f8fafc;border:0.5px solid #e2e8f0;border-radius:12px;padding:.875rem;margin-bottom:.75rem}
+.card .fi {margin-bottom: 0px;}
 .mak-card{background:#fdf4ff;border:0.5px solid #e9d5ff;border-radius:12px;padding:1rem;margin-bottom:.75rem}
 .mak-title{display:flex;align-items:center;gap:6px;margin-bottom:.75rem;font-weight:600;font-size:13px;color:#6b21a8}
 .mak-pos{display:flex;gap:8px;padding:8px 0;border-bottom:0.5px solid #e9d5ff}
@@ -351,7 +352,7 @@ function DetailView({session,onBack}){
     <p className="sub">{fmtD(session.date)} · {session.transcript?.length||0} реплик</p>
     <div className="tabs">
       {["transcript","notes","mak"].map(t=>(<button key={t} className={"tab"+(tab===t?" on":"")} onClick={()=>setTab(t)}>{t==="transcript"?"Транскрипт":t==="notes"?"ЭОТ-заметки":"МАК-техника"}</button>))}
-      <button className="btn btn-outline" style={{marginLeft:"auto",fontSize:11,padding:"4px 10px"} onClick={()=>navigator.clipboard.writeText(full)}><i className="ti ti-copy"></i>Копировать</button>
+      <button className="btn btn-outline" style={{marginLeft:"auto",fontSize:11,padding:"4px 10px"}} onClick={()=>navigator.clipboard.writeText(full)}><i className="ti ti-copy"></i>Копировать</button>
     </div>
     {tab==="transcript"&&(session.transcript||[]).map((t,i)=>(<div key={i} className={"ti-item "+(t.speaker==="Клиент"?"client":"psychologist")}>
       <div style={{fontSize:10,color:"#94a3b8",marginBottom:2,fontWeight:600}}>{t.speaker} · {t.time}</div>
@@ -401,82 +402,4 @@ function App(){
   const[sessions,setSessions]=useState([]);
   const[sett,setSett]=useState({provider:"claude",claudeKey:"",openaiKey:"",geminiKey:"",vkKey:"",lang:"ru-RU"});
   const[showSett,setShowSett]=useState(false);
-  const[sel,setSel]=useState(null);
-  const[isRec,setIsRec]=useState(false);
-  const[tr,setTr]=useState([]);
-  const[notes,setNotes]=useState([]);
-  const[mak,setMak]=useState(null);
-  const[spk,setSpk]=useState("Клиент");
-  const[auto,setAuto]=useState(true);
-  const[lN,setLN]=useState(false);
-  const[lM,setLM]=useState(false);
-  const[name,setName]=useState("");
-  const[interim,setInterim]=useState("");
-  const[fbLoading,setFbLoading]=useState(true);
-  const recRef=useRef(null);
-  const trEnd=useRef(null);
-  const trRef=useRef(tr);trRef.current=tr;
-  const isRecRef=useRef(isRec);isRecRef.current=isRec;
-  const spkRef=useRef(spk);spkRef.current=spk;
-  const atRef=useRef(null);
-  const lNRef=useRef(lN);lNRef.current=lN;
-  const settRef=useRef(sett);settRef.current=sett;
-  useEffect(()=>{fbLoad().then(d=>{setSessions(d);setFbLoading(false);});fbLoadSett().then(d=>{if(d)setSett(s=>({...s,...d}));});},[]);
-  useEffect(()=>{trEnd.current?.scrollIntoView({behavior:"smooth"});},[tr,interim]);
-  async function doN(a=false){
-    if(trRef.current.length===0||lNRef.current)return;
-    setLN(true);
-    try{const t=await ai(ESYS,"Транскрипт:\n\n"+trRef.current.map(t=>t.speaker+": "+t.text).join("\n")+"\n\nДай заметки.",settRef.current);setNotes(prev=>[...prev,{time:fmt(new Date()),content:t,auto:a}]);}catch(e){console.error(e);}
-    setLN(false);
-  }
-  async function doM(){
-    if(trRef.current.length===0)return;
-    setLM(true);
-    try{const raw=await ai(MSYS,"Транскрипт:\n\n"+trRef.current.map(t=>t.speaker+": "+t.text).join("\n")+"\n\nСоставь МАК-технику.",settRef.current);const parsed=JSON.parse(raw.replace(/```json|```/g,"").trim());setMak(parsed);}
-    catch(e){setMak({title:"Ошибка",request:"",positions:[{num:1,title:"Ошибка",instruction:String(e),questions:[]}]});}
-    setLM(false);
-  }
-  function startRec(){
-    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-    if(!SR){alert("Требуется Google Chrome.");return;}
-    const r=new SR();r.continuous=true;r.interimResults=true;r.lang=sett.lang||"ru-RU";
-    r.onresult=e=>{
-      let itr="";
-      for(let i=e.resultIndex;i<e.results.length;i++){const res=e.results[i];if(res.isFinal){const t=clean(res[0].transcript.trim());if(t){const s=spkRef.current;setTr(prev=>{if(prev.length>0&&prev[prev.length-1].speaker===s){const u=[...prev];u[u.length-1]={...u[u.length-1],text:u[u.length-1].text+" "+t};return u;}return[...prev,{speaker:s,text:t,time:fmt(new Date())}];});setInterim("");}}else itr+=res[0].transcript;}
-      setInterim(itr);
-    };
-    r.onerror=e=>{if(e.error!=="no-speech")console.error(e.error);};
-    r.onend=()=>{if(isRecRef.current)try{r.start();}catch{}};
-    r.start();recRef.current=r;setIsRec(true);
-    if(auto)atRef.current=setInterval(()=>{if(trRef.current.length>2)doN(true);},60000);
-  }
-  function stopRec(){recRef.current?.stop();recRef.current=null;setIsRec(false);setInterim("");if(atRef.current)clearInterval(atRef.current);}
-  async function endSess(){
-    stopRec();if(tr.length===0){setView("home");return;}
-    let fn=notes;
-    if(notes.length===0){setLN(true);try{const t=await ai(ESYS,"Транскрипт:\n\n"+tr.map(t=>t.speaker+": "+t.text).join("\n"),settRef.current);fn=[{time:fmt(new Date()),content:t,auto:true}];setNotes(fn);}catch{}setLN(false);}
-    const s={id:Date.now().toString(),name:name||"Сессия "+new Date().toLocaleDateString("ru"),date:new Date().toISOString(),transcript:tr,notes:fn,mak};
-    setSessions(prev=>[s,...prev]);await fbSave(s);
-    setTr([]);setNotes([]);setMak(null);setName("");setView("home");
-  }
-  async function delS(id){setSessions(prev=>prev.filter(s=>s.id!==id));await fbDel(id);}
-  async function saveSett(s){setSett(s);settRef.current=s;await fbSaveSett(s);}
-  function nav(v){if(v==="live"&&view!=="live"){setTr([]);setNotes([]);setMak(null);}setView(v);}
-  return(<div>
-    <Sidebar view={view} setView={nav} isRec={isRec} onSett={()=>setShowSett(true)}/>
-    <div className="page">
-      {fbLoading&&<div style={{textAlign:"center",padding:"3rem",color:"#94a3b8"}}><span className="spin"></span>Загружаю из Firebase...</div>}
-      {!fbLoading&&<>
-        {view==="home"&&<HomeView sessions={sessions} onStart={()=>{setTr([]);setNotes([]);setMak(null);setView("live");}} onFile={()=>setView("file")} onSelect={s=>{setSel(s);setView("detail");}} onDel={delS}/>}
-        {view==="live"&&<LiveView isRec={isRec} tr={tr} notes={notes} mak={mak} interim={interim} spk={spk} setSpk={setSpk} lN={lN} lM={lM} name={name} setName={setName} auto={auto} setAuto={setAuto} onStart={startRec} onStop={stopRec} onN={()=>doN(false)} onM={doM} onEnd={endSess} trEnd={trEnd} sett={sett}/>}
-        {view==="file"&&<FileView sett={sett}/>}
-        {view==="detail"&&sel&&<DetailView session={sel} onBack={()=>setView("home")}/>}
-      </>}
-    </div>
-    {showSett&&<SettingsModal sett={sett} onSave={saveSett} onClose={()=>setShowSett(false)}/>}
-  </div>);
-}
-ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
-</script>
-</body>
-</html>
+  const
